@@ -80,11 +80,11 @@ docker compose down
 docker run -d \
     -p <宿主机_服务端口>:2048 \
     -p <宿主机_流端口>:3120 \
-    -v "$(pwd)/auth_profiles":/app/auth_profiles \
+    -v "$(pwd)/../auth_profiles":/app/auth_profiles \
     -v "$(pwd)/.env":/app/.env \
     # 可选: 如果您想使用自己的 SSL/TLS 证书，请取消下面一行的注释。
     # 请确保宿主机上的 'certs/' 目录存在，并且其中包含应用程序所需的证书文件。
-    # -v "$(pwd)/certs":/app/certs \
+    # -v "$(pwd)/../certs":/app/certs \
     --name ai-studio-proxy-container \
     ai-studio-proxy:latest
 ```
@@ -225,7 +225,7 @@ DEFAULT_TOP_P=0.95
 docker run -d \
     -p 8080:2048 \
     -p 8081:3120 \
-    -v "$(pwd)/auth_profiles":/app/auth_profiles \
+    -v "$(pwd)/../auth_profiles":/app/auth_profiles \
     -v "$(pwd)/.env":/app/.env \
     --name ai-studio-proxy-container \
     ai-studio-proxy:latest
