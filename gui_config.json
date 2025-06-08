@@ -4,7 +4,7 @@
   "stream_port": "3120",
   "stream_port_enabled": true,
   "helper_endpoint": "",
-  "helper_enabled": true,
+  "helper_enabled": false,
   "proxy_address": "http://127.0.0.1:7890",
   "proxy_enabled": true
 }
