@@ -51,4 +51,4 @@ NO_PROXY_ENV = os.environ.get('NO_PROXY')
 # --- 脚本注入配置 ---
 ENABLE_SCRIPT_INJECTION = get_boolean_env('ENABLE_SCRIPT_INJECTION', True)
 USERSCRIPT_PATH = get_environment_variable('USERSCRIPT_PATH', 'browser_utils/more_modles.js')
-MODEL_CONFIG_PATH = get_environment_variable('MODEL_CONFIG_PATH', 'browser_utils/model_configs.json')
+# 注意：MODEL_CONFIG_PATH 已废弃，现在直接从油猴脚本解析模型数据

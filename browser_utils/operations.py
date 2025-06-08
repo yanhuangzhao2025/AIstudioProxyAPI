@@ -55,27 +55,55 @@ async def get_raw_text_content(response_element: Locator, previous_text: str, re
     return raw_text
 
 def _parse_userscript_models(script_content: str):
-    """从油猴脚本中解析模型列表 - 简化版本"""
+    """从油猴脚本中解析模型列表 - 使用JSON解析方式"""
     try:
-        # 查找所有 name: 'models/xxx' 的行（使用单引号）
-        name_pattern = r"name:\s*'(models/[^']+)'"
-        name_matches = re.findall(name_pattern, script_content)
+        # 查找脚本版本号
+        version_pattern = r'const\s+SCRIPT_VERSION\s*=\s*[\'"]([^\'"]+)[\'"]'
+        version_match = re.search(version_pattern, script_content)
+        script_version = version_match.group(1) if version_match else "v1.6"
 
-        if not name_matches:
+        # 查找 MODELS_TO_INJECT 数组的内容
+        models_array_pattern = r'const\s+MODELS_TO_INJECT\s*=\s*(\[.*?\]);'
+        models_match = re.search(models_array_pattern, script_content, re.DOTALL)
+
+        if not models_match:
+            logger.warning("未找到 MODELS_TO_INJECT 数组")
             return []
 
+        models_js_code = models_match.group(1)
+
+        # 将JavaScript数组转换为JSON格式
+        # 1. 替换模板字符串中的变量
+        models_js_code = models_js_code.replace('${SCRIPT_VERSION}', script_version)
+
+        # 2. 移除JavaScript注释
+        models_js_code = re.sub(r'//.*?$', '', models_js_code, flags=re.MULTILINE)
+
+        # 3. 将JavaScript对象转换为JSON格式
+        # 移除尾随逗号
+        models_js_code = re.sub(r',\s*([}\]])', r'\1', models_js_code)
+
+        # 替换单引号为双引号
+        models_js_code = re.sub(r"(\w+):\s*'([^']*)'", r'"\1": "\2"', models_js_code)
+        # 替换反引号为双引号
+        models_js_code = re.sub(r'(\w+):\s*`([^`]*)`', r'"\1": "\2"', models_js_code)
+        # 确保属性名用双引号
+        models_js_code = re.sub(r'(\w+):', r'"\1":', models_js_code)
+
+        # 4. 解析JSON
+        import json
+        models_data = json.loads(models_js_code)
+
         models = []
-        for name in name_matches:
-            # 为每个找到的模型创建基本信息
-            simple_name = name[7:]  # 移除 'models/' 前缀
-            display_name = simple_name.replace('-', ' ').replace('ab test', '').replace('  ', ' ').title().strip()
+        for model_obj in models_data:
+            if isinstance(model_obj, dict) and 'name' in model_obj:
+                models.append({
+                    'name': model_obj.get('name', ''),
+                    'displayName': model_obj.get('displayName', ''),
+                    'description': model_obj.get('description', '')
+                })
 
-            models.append({
-                'name': name,
-                'displayName': f"🤖 {display_name}",
-                'description': f"Model from userscript: {simple_name}"
-            })
-
+        logger.info(f"成功解析 {len(models)} 个模型从油猴脚本")
         return models
 
     except Exception as e:
@@ -125,9 +153,7 @@ def _get_injected_models():
             display_name = model.get('displayName', model.get('display_name', simple_id))
             description = model.get('description', f'Injected model: {simple_id}')
 
-            # 清理显示名称中的模板字符串
-            display_name = re.sub(r'\$\{[^}]+\}', '', display_name)
-            display_name = re.sub(r'\(Script [^)]+\)', '', display_name).strip()
+            # 注意：不再清理显示名称，保留原始的emoji和版本信息
 
             model_entry = {
                 "id": simple_id,

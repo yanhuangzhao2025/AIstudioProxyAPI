@@ -80,7 +80,6 @@ __all__ = [
     'NO_PROXY_ENV',
     'ENABLE_SCRIPT_INJECTION',
     'USERSCRIPT_PATH',
-    'MODEL_CONFIG_PATH',
 
     # 工具函数
     'get_environment_variable',

@@ -25,9 +25,8 @@ nano .env
 # 启用脚本注入
 ENABLE_SCRIPT_INJECTION=true
 
-# 使用默认脚本和配置
+# 使用默认脚本（模型数据直接从脚本解析）
 USERSCRIPT_PATH=browser_utils/more_modles.js
-MODEL_CONFIG_PATH=browser_utils/model_configs.json
 ```
 
 ### 2. 启动容器
@@ -42,28 +41,28 @@ docker compose logs -f | grep "脚本注入"
 
 ## 自定义配置
 
-### 方法 1: 直接替换配置文件
+### 方法 1: 直接替换脚本文件
 
 ```bash
-# 1. 创建自定义模型配置
-cp model_configs_docker_example.json ../browser_utils/model_configs.json
+# 1. 创建自定义油猴脚本
+cp ../browser_utils/more_modles.js ../browser_utils/my_custom_script.js
 
-# 2. 编辑配置文件
-nano ../browser_utils/model_configs.json
+# 2. 编辑脚本文件中的 MODELS_TO_INJECT 数组
+nano ../browser_utils/my_custom_script.js
 
 # 3. 重启容器
 docker compose restart
 ```
 
-### 方法 2: 挂载自定义配置
+### 方法 2: 挂载自定义脚本
 
 ```bash
-# 1. 创建自定义配置文件
-cp model_configs_docker_example.json ../browser_utils/my_models.json
+# 1. 创建自定义脚本文件
+cp ../browser_utils/more_modles.js ../browser_utils/my_script.js
 
 # 2. 编辑 docker-compose.yml，取消注释并修改：
 # volumes:
-#   - ../browser_utils/my_models.json:/app/browser_utils/model_configs.json:ro
+#   - ../browser_utils/my_script.js:/app/browser_utils/more_modles.js:ro
 
 # 3. 重启服务
 docker compose down
@@ -74,10 +73,10 @@ docker compose up -d
 
 ```bash
 # 1. 在 .env 文件中修改路径
-echo "MODEL_CONFIG_PATH=browser_utils/my_custom_models.json" >> .env
+echo "USERSCRIPT_PATH=browser_utils/my_custom_script.js" >> .env
 
-# 2. 创建对应的配置文件
-cp model_configs_docker_example.json ../browser_utils/my_custom_models.json
+# 2. 创建对应的脚本文件
+cp ../browser_utils/more_modles.js ../browser_utils/my_custom_script.js
 
 # 3. 重启容器
 docker compose restart
@@ -100,13 +99,12 @@ docker compose logs -f | grep -E "(脚本注入|script.*inject|模型增强)"
 成功的脚本注入应该显示类似以下日志：
 
 ```
-开始注入模型增强脚本...
-成功加载脚本: more_modles.js
-成功加载模型配置: 6 个模型
-成功生成动态脚本，包含 6 个模型
-成功注入脚本到页面: dynamic_model_injector
-✅ 模型增强脚本注入成功
-   使用自定义模型配置: browser_utils/model_configs.json
+设置网络拦截和脚本注入...
+成功设置模型列表网络拦截
+成功解析 6 个模型从油猴脚本
+添加了 6 个注入的模型到API模型列表
+✅ 脚本注入成功，模型显示效果与油猴脚本100%一致
+   解析的模型: 👑 Kingfall, ✨ Gemini 2.5 Pro, 🦁 Goldmane...
 ```
 
 ### 进入容器检查
@@ -115,10 +113,10 @@ docker compose logs -f | grep -E "(脚本注入|script.*inject|模型增强)"
 # 进入容器
 docker compose exec ai-studio-proxy /bin/bash
 
-# 检查配置文件
-cat /app/browser_utils/model_configs.json
-
 # 检查脚本文件
+cat /app/browser_utils/more_modles.js
+
+# 检查脚本文件列表
 ls -la /app/browser_utils/*.js
 
 # 退出容器
@@ -136,7 +134,7 @@ exit
 
 2. **检查文件权限**：
    ```bash
-   docker compose exec ai-studio-proxy cat /app/browser_utils/model_configs.json
+   docker compose exec ai-studio-proxy cat /app/browser_utils/more_modles.js
    ```
 
 3. **查看详细错误日志**：
@@ -144,12 +142,12 @@ exit
    docker compose logs | grep -A 5 -B 5 "脚本注入"
    ```
 
-### 配置文件无效
+### 脚本文件无效
 
-1. **验证 JSON 格式**：
+1. **验证 JavaScript 格式**：
    ```bash
-   # 在主机上验证 JSON
-   python3 -m json.tool browser_utils/model_configs.json
+   # 在主机上验证 JavaScript 语法
+   node -c browser_utils/more_modles.js
    ```
 
 2. **检查必需字段**：

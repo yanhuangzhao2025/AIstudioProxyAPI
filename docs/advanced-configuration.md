@@ -142,11 +142,11 @@ deprecated-model-id
 USERSCRIPT_PATH=custom_scripts/my_enhanced_script.js
 ```
 
-#### 自定义模型配置
+#### 自定义脚本配置
 
 ```env
-# 使用外部模型配置文件（可选）
-MODEL_CONFIG_PATH=configs/production_models.json
+# 使用自定义脚本文件（模型数据直接从脚本解析）
+USERSCRIPT_PATH=configs/production_script.js
 ```
 
 #### 调试模式
@@ -174,20 +174,22 @@ const MODELS_TO_INJECT = [
 ];
 ```
 
-#### 模型配置文件格式
+#### 脚本模型数组格式
 
-```json
-{
-    "description": "自定义模型配置",
-    "version": "1.0",
-    "models": [
-        {
-            "name": "models/custom-model-1",
-            "displayName": "🎯 Custom Model 1",
-            "description": "First custom model"
-        }
-    ]
-}
+```javascript
+const MODELS_TO_INJECT = [
+    {
+        name: 'models/custom-model-1',
+        displayName: `🎯 Custom Model 1 (Script ${SCRIPT_VERSION})`,
+        description: `First custom model injected by script ${SCRIPT_VERSION}`
+    },
+    {
+        name: 'models/custom-model-2',
+        displayName: `⚡ Custom Model 2 (Script ${SCRIPT_VERSION})`,
+        description: `Second custom model injected by script ${SCRIPT_VERSION}`
+    }
+];
+```
 ```
 
 ### 网络拦截技术细节
