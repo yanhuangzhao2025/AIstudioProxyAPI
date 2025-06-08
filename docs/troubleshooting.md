@@ -1,6 +1,37 @@
 # 故障排除指南
 
-本文档提供常见问题的解决方案和调试方法。
+本文档提供 AI Studio Proxy API 项目常见问题的解决方案和调试方法，涵盖安装、配置、运行、API使用等各个方面。
+
+## 快速诊断
+
+在深入具体问题之前，可以先进行快速诊断：
+
+### 1. 检查服务状态
+```bash
+# 检查服务是否正常运行
+curl http://127.0.0.1:2048/health
+
+# 检查API信息
+curl http://127.0.0.1:2048/api/info
+```
+
+### 2. 检查配置文件
+```bash
+# 检查 .env 文件是否存在
+ls -la .env
+
+# 检查关键配置项
+grep -E "(PORT|SCRIPT_INJECTION|LOG_LEVEL)" .env
+```
+
+### 3. 查看日志
+```bash
+# 查看最新日志
+tail -f logs/app.log
+
+# 查看错误日志
+grep -i error logs/app.log
+```
 
 ## 安装相关问题
 

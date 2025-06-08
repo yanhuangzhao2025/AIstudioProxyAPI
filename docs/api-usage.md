@@ -1,6 +1,16 @@
 # API 使用指南
 
-代理服务器默认监听在 `http://127.0.0.1:2048`。端口可以在 [`launch_camoufox.py`](../launch_camoufox.py) 的 `--server-port` 参数或 [`gui_launcher.py`](../gui_launcher.py) 中修改。
+本指南详细介绍如何使用 AI Studio Proxy API 的各种功能和端点。
+
+## 服务器配置
+
+代理服务器默认监听在 `http://127.0.0.1:2048`。端口可以通过以下方式配置：
+
+- **环境变量**: 在 `.env` 文件中设置 `PORT=2048` 或 `DEFAULT_FASTAPI_PORT=2048`
+- **命令行参数**: 使用 `--server-port` 参数
+- **GUI 启动器**: 在图形界面中直接配置端口
+
+推荐使用 `.env` 文件进行配置管理，详见 [环境变量配置指南](environment-configuration.md)。
 
 ## API 密钥配置
 
