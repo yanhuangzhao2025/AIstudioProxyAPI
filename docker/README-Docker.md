@@ -335,27 +335,25 @@ Docker 环境现在支持油猴脚本动态注入功能，可以增强 AI Studio
 ENABLE_SCRIPT_INJECTION=true
 
 # 油猴脚本文件路径（容器内路径）
+# 模型数据直接从此脚本文件中解析，无需额外配置文件
 USERSCRIPT_PATH=browser_utils/more_modles.js
-
-# 模型配置文件路径（容器内路径）
-MODEL_CONFIG_PATH=browser_utils/model_configs.json
 ```
 
 ### 自定义脚本和模型配置
 
 如果您想使用自定义的脚本或模型配置：
 
-1. **自定义模型配置**：
+1. **自定义脚本配置**：
    ```bash
-   # 在主机上创建自定义配置文件
-   cp browser_utils/model_configs_example.json browser_utils/my_models.json
-   # 编辑 my_models.json 添加您的模型
+   # 在主机上创建自定义脚本文件
+   cp browser_utils/more_modles.js browser_utils/my_script.js
+   # 编辑 my_script.js 中的 MODELS_TO_INJECT 数组
 
    # 在 docker-compose.yml 中取消注释并修改挂载行：
-   # - ../browser_utils/my_models.json:/app/browser_utils/model_configs.json:ro
+   # - ../browser_utils/my_script.js:/app/browser_utils/more_modles.js:ro
 
    # 或者在 .env 中修改路径：
-   # MODEL_CONFIG_PATH=browser_utils/my_models.json
+   # USERSCRIPT_PATH=browser_utils/my_script.js
    ```
 
 2. **自定义脚本**：

@@ -34,10 +34,8 @@
 ENABLE_SCRIPT_INJECTION=true
 
 # 油猴脚本文件路径（相对于项目根目录）
+# 模型数据直接从此脚本文件中解析，无需额外配置文件
 USERSCRIPT_PATH=browser_utils/more_modles.js
-
-# 模型配置文件路径（相对于项目根目录）
-MODEL_CONFIG_PATH=browser_utils/model_configs.json
 ```
 
 ### 工作原理说明
@@ -53,10 +51,10 @@ MODEL_CONFIG_PATH=browser_utils/model_configs.json
 3. **同步**: 将解析出的模型添加到API模型列表
 
 **优势**:
-- ✅ **无配置文件** - 不需要手动维护模型配置
-- ✅ **自动同步** - 脚本更新时自动获取新模型
-- ✅ **前后端一致** - 确保显示和API完全一致
-- ✅ **零适配成本** - 无需为脚本更新做任何适配
+- ✅ **单一数据源** - 模型数据直接从油猴脚本解析，无需配置文件
+- ✅ **自动同步** - 脚本更新时自动获取新模型，保持前后端一致
+- ✅ **完美适配** - 与油猴脚本显示效果100%一致（emoji、版本号等）
+- ✅ **零维护成本** - 无需为脚本更新做任何适配工作
 
 ## 使用方法
 
@@ -117,8 +115,8 @@ ENABLE_SCRIPT_INJECTION=true
 4. **模型列表请求识别** - 检测包含 `alkalimakersuite` 和 `ListModels` 的请求
 5. **响应修改** - 直接修改模型列表响应，注入自定义模型
 6. **脚本注入备用** - 同时注入 JavaScript 脚本作为备用方案
-7. **后端解析** - 使用正则表达式解析脚本中的 `MODELS_TO_INJECT` 数组
-8. **API集成** - 将转换后的模型添加到后端模型列表
+7. **后端解析** - 使用JSON解析技术解析脚本中的 `MODELS_TO_INJECT` 数组
+8. **API集成** - 将解析出的模型（保留原始emoji和版本信息）添加到后端模型列表
 
 ### 🎯 技术优势
 
@@ -163,17 +161,20 @@ curl -X POST http://localhost:2048/v1/chat/completions \
 启用脚本注入后，您将在日志中看到类似输出：
 
 ```
-开始注入模型增强脚本...
-成功加载脚本: more_modles.js
-成功加载模型配置: 6 个模型
-成功生成动态脚本，包含 6 个模型
-成功注入脚本到页面: dynamic_model_injector
-✅ 模型增强脚本注入成功
-   使用自定义模型配置: browser_utils/model_configs.json
+# 网络拦截相关日志
+设置网络拦截和脚本注入...
+成功设置模型列表网络拦截
+成功解析 6 个模型从油猴脚本
 
-# 在模型列表响应处理时还会看到：
+# 模型列表响应处理时的日志
+捕获到潜在的模型列表响应来自: https://alkalimakersuite.googleapis.com/...
 添加了 6 个注入的模型到API模型列表
 成功解析和更新模型列表。总共解析模型数: 12
+
+# 解析出的模型示例
+👑 Kingfall (Script v1.6)
+✨ Gemini 2.5 Pro 03-25 (Script v1.6)
+🦁 Goldmane (Script v1.6)
 ```
 
 ## 故障排除
@@ -184,11 +185,11 @@ curl -X POST http://localhost:2048/v1/chat/completions \
 2. **检查文件权限** - 确保脚本文件可读
 3. **查看日志** - 检查详细的错误信息
 
-### 模型配置无效
+### 模型解析失败
 
-1. **JSON 格式** - 确保配置文件是有效的 JSON 格式
+1. **脚本格式** - 确保油猴脚本中的 `MODELS_TO_INJECT` 数组格式正确
 2. **必需字段** - 确保每个模型都有 `name` 和 `displayName` 字段
-3. **文件路径** - 确保 `MODEL_CONFIG_PATH` 指向正确的文件
+3. **JavaScript语法** - 确保脚本文件是有效的JavaScript格式
 
 ### 禁用脚本注入
 
@@ -208,24 +209,25 @@ ENABLE_SCRIPT_INJECTION=false
 USERSCRIPT_PATH=custom_scripts/my_script.js
 ```
 
-### 多套配置
+### 多套脚本
 
-通过修改 `MODEL_CONFIG_PATH` 可以使用不同的模型配置：
+通过修改 `USERSCRIPT_PATH` 可以使用不同的油猴脚本：
 
 ```bash
-MODEL_CONFIG_PATH=configs/production_models.json
+USERSCRIPT_PATH=custom_scripts/production_models.js
 ```
 
 ### 版本管理
 
-系统会自动为动态生成的脚本添加版本标识，您可以在浏览器控制台中看到注入的模型带有版本信息。
+系统会自动解析脚本中的版本信息，保持与油猴脚本完全一致的显示效果，包括emoji和版本标识。
 
 ## 注意事项
 
-1. **重启生效** - 脚本或配置文件更新后需要重启服务
+1. **重启生效** - 脚本文件更新后需要重启服务
 2. **浏览器缓存** - 如果模型列表没有更新，尝试刷新页面或清除浏览器缓存
 3. **兼容性** - 确保您的油猴脚本与当前的 AI Studio 页面结构兼容
 4. **性能影响** - 大量模型注入可能影响页面加载性能
+5. **显示一致性** - 系统确保前端显示与油猴脚本效果100%一致
 
 ## 示例配置
 
@@ -238,7 +240,6 @@ ENABLE_SCRIPT_INJECTION=true
 
 # 脚本配置
 USERSCRIPT_PATH=browser_utils/more_modles.js
-MODEL_CONFIG_PATH=browser_utils/model_configs.json
 
 # 其他配置...
 ```

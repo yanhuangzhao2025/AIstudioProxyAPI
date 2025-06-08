@@ -170,17 +170,14 @@ GUI_DEFAULT_HELPER_ENDPOINT=
 ENABLE_SCRIPT_INJECTION=true
 
 # 油猴脚本文件路径（相对于项目根目录）
+# 模型数据直接从此脚本文件中解析，无需额外配置文件
 USERSCRIPT_PATH=browser_utils/more_modles.js
-
-# 模型配置文件路径（相对于项目根目录）
-# 如果文件不存在，将使用脚本内置的模型列表
-MODEL_CONFIG_PATH=browser_utils/model_configs.json
 ```
 
 **脚本注入功能说明**：
 - 支持动态挂载油猴脚本来增强 AI Studio 的模型列表
 - 使用 Playwright 原生网络拦截，确保 100% 可靠性
-- 支持自定义模型配置文件，灵活管理模型列表
+- 直接从油猴脚本解析模型数据，与前端显示效果100%一致
 - 脚本文件不存在时会静默跳过，不影响主要功能
 
 详细使用方法请参见 [脚本注入指南](script_injection_guide.md)。
@@ -244,9 +241,8 @@ STREAM_PORT=3121
 # 启用脚本注入功能
 ENABLE_SCRIPT_INJECTION=true
 
-# 使用自定义脚本和配置
+# 使用自定义脚本（模型数据直接从脚本解析）
 USERSCRIPT_PATH=browser_utils/my_custom_script.js
-MODEL_CONFIG_PATH=browser_utils/my_models.json
 
 # 调试模式查看注入效果
 DEBUG_LOGS_ENABLED=true

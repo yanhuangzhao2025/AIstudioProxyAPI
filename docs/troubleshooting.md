@@ -345,27 +345,27 @@ python launch_camoufox.py --debug
 - 网络路由设置异常
 - 请求 URL 不匹配拦截规则
 
-### 模型配置文件问题
+### 模型解析问题
 
-**JSON 格式错误**:
+**脚本格式错误**:
 ```bash
-# 验证 JSON 格式
-python3 -m json.tool browser_utils/model_configs.json
+# 检查脚本文件语法
+node -c browser_utils/more_modles.js
 ```
 
 **文件权限问题**:
 ```bash
 # 检查文件权限
-ls -la browser_utils/model_configs.json
+ls -la browser_utils/more_modles.js
 
 # 修复权限
-chmod 644 browser_utils/model_configs.json
+chmod 644 browser_utils/more_modles.js
 ```
 
-**配置文件不存在**:
-- 系统会静默跳过不存在的配置文件
-- 检查 `MODEL_CONFIG_PATH` 环境变量设置
-- 使用示例配置文件作为模板
+**脚本文件不存在**:
+- 系统会静默跳过不存在的脚本文件
+- 检查 `USERSCRIPT_PATH` 环境变量设置
+- 确保脚本文件包含有效的 `MODELS_TO_INJECT` 数组
 
 ### 性能问题
 
