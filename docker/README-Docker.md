@@ -56,11 +56,11 @@ Docker Compose 提供了更简洁的配置管理方式，特别适合使用 `.en
 
 ```bash
 # 1. 准备配置文件 (进入 docker 目录)
+cd docker
 cp .env.docker .env
 # 编辑 .env 文件以适应您的需求
 
-# 2. 使用 Docker Compose 启动 (进入 docker 目录)
-cd docker
+# 2. 使用 Docker Compose 启动 (在 docker 目录下)
 docker compose up -d
 
 # 3. 查看日志
@@ -80,11 +80,11 @@ docker compose down
 docker run -d \
     -p <宿主机_服务端口>:2048 \
     -p <宿主机_流端口>:3120 \
-    -v "$(pwd)/auth_profiles":/app/auth_profiles \
+    -v "$(pwd)/../auth_profiles":/app/auth_profiles \
     -v "$(pwd)/.env":/app/.env \
     # 可选: 如果您想使用自己的 SSL/TLS 证书，请取消下面一行的注释。
     # 请确保宿主机上的 'certs/' 目录存在，并且其中包含应用程序所需的证书文件。
-    # -v "$(pwd)/certs":/app/certs \
+    # -v "$(pwd)/../certs":/app/certs \
     --name ai-studio-proxy-container \
     ai-studio-proxy:latest
 ```
@@ -150,7 +150,7 @@ docker run -d \
 
 1. **创建 `.env` 配置文件 (推荐):**
    ```bash
-   # 复制配置模板 (在项目docker目录下执行)
+   # 复制配置模板 (在项目 docker 目录下执行)
    cp .env.docker .env
 
    # 编辑配置文件
@@ -204,6 +204,11 @@ AUTO_CONFIRM_LOGIN=true
 AUTO_SAVE_AUTH=false
 AUTH_SAVE_TIMEOUT=30
 
+# 脚本注入配置
+ENABLE_SCRIPT_INJECTION=true
+USERSCRIPT_PATH=browser_utils/more_modles.js
+MODEL_CONFIG_PATH=browser_utils/model_configs.json
+
 # API 默认参数
 DEFAULT_TEMPERATURE=1.0
 DEFAULT_MAX_OUTPUT_TOKENS=65536
@@ -225,7 +230,7 @@ DEFAULT_TOP_P=0.95
 docker run -d \
     -p 8080:2048 \
     -p 8081:3120 \
-    -v "$(pwd)/auth_profiles":/app/auth_profiles \
+    -v "$(pwd)/../auth_profiles":/app/auth_profiles \
     -v "$(pwd)/.env":/app/.env \
     --name ai-studio-proxy-container \
     ai-studio-proxy:latest
@@ -315,12 +320,78 @@ docker run -d \
 
 希望本教程能帮助您成功地通过 Docker 部署和运行 AI Studio Proxy API 项目！
 
+## 脚本注入配置 (新功能)
+
+### 概述
+
+Docker 环境现在支持油猴脚本动态注入功能，可以增强 AI Studio 的模型列表。
+
+### 配置选项
+
+在 `.env` 文件中配置以下选项：
+
+```env
+# 是否启用脚本注入功能
+ENABLE_SCRIPT_INJECTION=true
+
+# 油猴脚本文件路径（容器内路径）
+USERSCRIPT_PATH=browser_utils/more_modles.js
+
+# 模型配置文件路径（容器内路径）
+MODEL_CONFIG_PATH=browser_utils/model_configs.json
+```
+
+### 自定义脚本和模型配置
+
+如果您想使用自定义的脚本或模型配置：
+
+1. **自定义模型配置**：
+   ```bash
+   # 在主机上创建自定义配置文件
+   cp browser_utils/model_configs_example.json browser_utils/my_models.json
+   # 编辑 my_models.json 添加您的模型
+
+   # 在 docker-compose.yml 中取消注释并修改挂载行：
+   # - ../browser_utils/my_models.json:/app/browser_utils/model_configs.json:ro
+
+   # 或者在 .env 中修改路径：
+   # MODEL_CONFIG_PATH=browser_utils/my_models.json
+   ```
+
+2. **自定义脚本**：
+   ```bash
+   # 将自定义脚本放在 browser_utils/ 目录
+   cp your_custom_script.js browser_utils/custom_script.js
+
+   # 在 .env 中修改路径：
+   # USERSCRIPT_PATH=browser_utils/custom_script.js
+   ```
+
+### Docker Compose 挂载配置
+
+在 `docker-compose.yml` 中，您可以取消注释以下行来挂载自定义文件：
+
+```yaml
+volumes:
+  # 挂载自定义模型配置
+  - ../browser_utils/model_configs.json:/app/browser_utils/model_configs.json:ro
+  # 挂载自定义脚本目录
+  - ../browser_utils/custom_scripts:/app/browser_utils/custom_scripts:ro
+```
+
+### 注意事项
+
+- 脚本或配置文件更新后需要重启容器
+- 如果脚本注入失败，不会影响主要功能
+- 可以通过容器日志查看脚本注入状态
+
 ## 注意事项
 
 1. **认证文件**: Docker 部署需要预先在主机上获取有效的认证文件，并将其放置在 `auth_profiles/active/` 目录中。
 2. **模块化架构**: 项目采用模块化设计，所有配置和代码都已经过优化，无需手动修改。
 3. **端口配置**: 确保宿主机上的端口未被占用，默认使用 2048 (主服务) 和 3120 (流式代理)。
 4. **日志查看**: 可以通过 `docker logs` 命令查看容器运行日志，便于调试和监控。
+5. **脚本注入**: 新增的脚本注入功能默认启用，可通过 `ENABLE_SCRIPT_INJECTION=false` 禁用。
 
 ## 配置管理总结 ⭐
 
@@ -328,7 +399,7 @@ docker run -d \
 
 现在 Docker 部署完全支持 `.env` 文件配置管理：
 
-✅ **统一配置**: 主机和 Docker 环境使用相同的 `.env` 配置文件
+✅ **统一配置**: 使用 `.env` 文件管理所有配置
 ✅ **版本更新无忧**: `git pull` + `docker compose up -d` 即可完成更新
 ✅ **配置隔离**: 开发、测试、生产环境可使用不同的 `.env` 文件
 ✅ **安全性**: `.env` 文件不会被提交到版本控制
@@ -346,10 +417,7 @@ cp .env.docker .env
 docker compose up -d
 
 # 3. 版本更新
-cd ..  # 回到项目根目录
-git pull
-cd docker
-docker compose up -d --build
+bash update.sh
 
 # 4. 查看状态
 docker compose ps

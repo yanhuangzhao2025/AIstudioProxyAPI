@@ -1,0 +1,62 @@
+{
+  "description": "示例模型配置文件 - 展示如何添加自定义模型",
+  "version": "1.0",
+  "models": [
+    {
+      "name": "models/kingfall-ab-test",
+      "displayName": "👑 Kingfall",
+      "description": "Kingfall model - Advanced reasoning capabilities"
+    },
+    {
+      "name": "models/gemini-2.5-pro-preview-03-25",
+      "displayName": "✨ Gemini 2.5 Pro 03-25",
+      "description": "Latest Gemini 2.5 Pro preview model"
+    },
+    {
+      "name": "models/goldmane-ab-test",
+      "displayName": "🦁 Goldmane",
+      "description": "Goldmane model - Enhanced performance"
+    },
+    {
+      "name": "models/claybrook-ab-test",
+      "displayName": "💧 Claybrook",
+      "description": "Claybrook model - Specialized capabilities"
+    },
+    {
+      "name": "models/frostwind-ab-test",
+      "displayName": "❄️ Frostwind",
+      "description": "Frostwind model - Cold reasoning"
+    },
+    {
+      "name": "models/calmriver-ab-test",
+      "displayName": "🌊 Calmriver",
+      "description": "Calmriver model - Steady performance"
+    },
+    {
+      "name": "models/your-new-model-here",
+      "displayName": "🚀 Your New Model",
+      "description": "Add your custom model here - just copy this block and modify the values"
+    }
+  ],
+  "instructions": {
+    "how_to_add_models": [
+      "1. 复制上面的任意一个模型配置块",
+      "2. 修改 'name' 字段为您的模型ID（通常以 'models/' 开头）",
+      "3. 修改 'displayName' 字段为您想要显示的名称（可以包含emoji）",
+      "4. 修改 'description' 字段为模型描述",
+      "5. 保存文件并重启服务"
+    ],
+    "emoji_suggestions": {
+      "AI/Tech": "🤖 🧠 ⚡ 🔮 ✨ 🚀 💫",
+      "Animals": "🦁 🐺 🦅 🐉 🦄 🐾 🦋",
+      "Nature": "🌊 ❄️ 🔥 🌪️ ⛰️ 🌙 ☀️",
+      "Objects": "👑 💎 ⚔️ 🛡️ 🔱 💧 🌟"
+    },
+    "naming_tips": [
+      "使用有意义的emoji来区分不同类型的模型",
+      "保持显示名称简洁但具有描述性",
+      "模型ID必须与实际可用的模型匹配",
+      "避免使用特殊字符可能导致JavaScript错误"
+    ]
+  }
+}

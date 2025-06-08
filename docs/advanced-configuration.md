@@ -116,6 +116,170 @@ gemini-1.0-pro-vision
 deprecated-model-id
 ```
 
+## 脚本注入高级配置 🆕
+
+### 概述
+
+脚本注入功能允许您动态挂载油猴脚本来增强 AI Studio 的模型列表。该功能使用 Playwright 原生网络拦截技术，确保 100% 可靠性。
+
+### 工作原理
+
+1. **双重拦截机制**：
+   - **Playwright 路由拦截**：在网络层面直接拦截和修改模型列表响应
+   - **JavaScript 脚本注入**：作为备用方案，确保万无一失
+
+2. **自动模型解析**：
+   - 从油猴脚本中自动解析 `MODELS_TO_INJECT` 数组
+   - 前端和后端使用相同的模型数据源
+   - 无需手动维护模型配置文件
+
+### 高级配置选项
+
+#### 自定义脚本路径
+
+```env
+# 使用自定义脚本文件
+USERSCRIPT_PATH=custom_scripts/my_enhanced_script.js
+```
+
+#### 自定义模型配置
+
+```env
+# 使用外部模型配置文件（可选）
+MODEL_CONFIG_PATH=configs/production_models.json
+```
+
+#### 调试模式
+
+```env
+# 启用详细的脚本注入日志
+DEBUG_LOGS_ENABLED=true
+ENABLE_SCRIPT_INJECTION=true
+```
+
+### 自定义脚本开发
+
+#### 脚本格式要求
+
+您的自定义脚本必须包含 `MODELS_TO_INJECT` 数组：
+
+```javascript
+const MODELS_TO_INJECT = [
+    {
+        name: 'models/your-custom-model',
+        displayName: '🚀 Your Custom Model',
+        description: 'Custom model description'
+    },
+    // 更多模型...
+];
+```
+
+#### 模型配置文件格式
+
+```json
+{
+    "description": "自定义模型配置",
+    "version": "1.0",
+    "models": [
+        {
+            "name": "models/custom-model-1",
+            "displayName": "🎯 Custom Model 1",
+            "description": "First custom model"
+        }
+    ]
+}
+```
+
+### 网络拦截技术细节
+
+#### Playwright 路由拦截
+
+```javascript
+// 系统会自动设置类似以下的路由拦截
+await context.route("**/*", async (route) => {
+    const request = route.request();
+    if (request.url().includes('alkalimakersuite') &&
+        request.url().includes('ListModels')) {
+        // 拦截并修改模型列表响应
+        const response = await route.fetch();
+        const modifiedBody = await modifyModelListResponse(response);
+        await route.fulfill({ response, body: modifiedBody });
+    } else {
+        await route.continue_();
+    }
+});
+```
+
+#### 响应修改流程
+
+1. **请求识别**：检测包含 `alkalimakersuite` 和 `ListModels` 的请求
+2. **响应获取**：获取原始模型列表响应
+3. **数据解析**：解析 JSON 响应并处理反劫持前缀
+4. **模型注入**：将自定义模型注入到响应中
+5. **响应返回**：返回修改后的响应给浏览器
+
+### 故障排除
+
+#### 脚本注入失败
+
+1. **检查脚本文件**：
+   ```bash
+   # 验证脚本文件存在且可读
+   ls -la browser_utils/more_modles.js
+   cat browser_utils/more_modles.js | head -20
+   ```
+
+2. **检查日志输出**：
+   ```bash
+   # 查看脚本注入相关日志
+   python launch_camoufox.py --debug | grep -i "script\|inject"
+   ```
+
+3. **验证配置**：
+   ```bash
+   # 检查环境变量配置
+   grep SCRIPT .env
+   ```
+
+#### 模型未显示
+
+1. **前端检查**：在浏览器开发者工具中查看是否有 JavaScript 错误
+2. **后端检查**：查看 API 响应是否包含注入的模型
+3. **网络检查**：确认网络拦截是否正常工作
+
+### 性能优化
+
+#### 脚本缓存
+
+系统会自动缓存解析的模型列表，避免重复解析：
+
+```python
+# 系统内部缓存机制
+if not hasattr(self, '_cached_models'):
+    self._cached_models = parse_userscript_models(script_content)
+return self._cached_models
+```
+
+#### 网络拦截优化
+
+- 只拦截必要的请求，其他请求直接通过
+- 使用高效的 JSON 解析和序列化
+- 最小化响应修改的开销
+
+### 安全考虑
+
+#### 脚本安全
+
+- 脚本在受控的浏览器环境中执行
+- 不会影响主机系统安全
+- 建议只使用可信的脚本源
+
+#### 网络安全
+
+- 网络拦截仅限于特定的模型列表请求
+- 不会拦截或修改其他敏感请求
+- 所有修改都在本地进行，不会发送到外部服务器
+
 ## GUI 启动器高级功能
 
 ### 本地LLM模拟服务
@@ -167,5 +331,6 @@ API 请求中的模型参数（如 `temperature`, `max_output_tokens`, `top_p`, 
 ## 下一步
 
 高级配置完成后，请参考：
+- [脚本注入指南](script_injection_guide.md) - 详细的脚本注入功能使用说明
 - [日志控制指南](logging-control.md)
 - [故障排除指南](troubleshooting.md)

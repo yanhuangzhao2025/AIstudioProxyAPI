@@ -16,6 +16,237 @@ from models import ClientDisconnectedError
 
 logger = logging.getLogger("AIStudioProxyServer")
 
+
+async def _setup_network_interception_and_scripts(context: AsyncBrowserContext):
+    """设置网络拦截和脚本注入"""
+    try:
+        from config.settings import ENABLE_SCRIPT_INJECTION
+
+        if not ENABLE_SCRIPT_INJECTION:
+            logger.info("脚本注入功能已禁用")
+            return
+
+        # 设置网络拦截
+        await _setup_model_list_interception(context)
+
+        # 可选：仍然注入脚本作为备用方案
+        await _add_init_scripts_to_context(context)
+
+    except Exception as e:
+        logger.error(f"设置网络拦截和脚本注入时发生错误: {e}")
+
+
+async def _setup_model_list_interception(context: AsyncBrowserContext):
+    """设置模型列表网络拦截"""
+    try:
+        async def handle_model_list_route(route):
+            """处理模型列表请求的路由"""
+            request = route.request
+
+            # 检查是否是模型列表请求
+            if 'alkalimakersuite' in request.url and 'ListModels' in request.url:
+                logger.info(f"🔍 拦截到模型列表请求: {request.url}")
+
+                # 继续原始请求
+                response = await route.fetch()
+
+                # 获取原始响应
+                original_body = await response.body()
+
+                # 修改响应
+                modified_body = await _modify_model_list_response(original_body, request.url)
+
+                # 返回修改后的响应
+                await route.fulfill(
+                    response=response,
+                    body=modified_body
+                )
+            else:
+                # 对于其他请求，直接继续
+                await route.continue_()
+
+        # 注册路由拦截器
+        await context.route("**/*", handle_model_list_route)
+        logger.info("✅ 已设置模型列表网络拦截")
+
+    except Exception as e:
+        logger.error(f"设置模型列表网络拦截时发生错误: {e}")
+
+
+async def _modify_model_list_response(original_body: bytes, url: str) -> bytes:
+    """修改模型列表响应"""
+    try:
+        # 解码响应体
+        original_text = original_body.decode('utf-8')
+
+        # 处理反劫持前缀
+        ANTI_HIJACK_PREFIX = ")]}'\n"
+        has_prefix = False
+        if original_text.startswith(ANTI_HIJACK_PREFIX):
+            original_text = original_text[len(ANTI_HIJACK_PREFIX):]
+            has_prefix = True
+
+        # 解析JSON
+        import json
+        json_data = json.loads(original_text)
+
+        # 注入模型
+        modified_data = await _inject_models_to_response(json_data, url)
+
+        # 序列化回JSON
+        modified_text = json.dumps(modified_data, separators=(',', ':'))
+
+        # 重新添加前缀
+        if has_prefix:
+            modified_text = ANTI_HIJACK_PREFIX + modified_text
+
+        logger.info("✅ 成功修改模型列表响应")
+        return modified_text.encode('utf-8')
+
+    except Exception as e:
+        logger.error(f"修改模型列表响应时发生错误: {e}")
+        return original_body
+
+
+async def _inject_models_to_response(json_data: dict, url: str) -> dict:
+    """向响应中注入模型"""
+    try:
+        from .operations import _get_injected_models
+
+        # 获取要注入的模型
+        injected_models = _get_injected_models()
+        if not injected_models:
+            logger.info("没有要注入的模型")
+            return json_data
+
+        # 查找模型数组
+        models_array = _find_model_list_array(json_data)
+        if not models_array:
+            logger.warning("未找到模型数组结构")
+            return json_data
+
+        # 找到模板模型
+        template_model = _find_template_model(models_array)
+        if not template_model:
+            logger.warning("未找到模板模型")
+            return json_data
+
+        # 注入模型
+        for model in reversed(injected_models):  # 反向以保持顺序
+            model_name = model['raw_model_path']
+
+            # 检查模型是否已存在
+            if not any(m[0] == model_name for m in models_array if isinstance(m, list) and len(m) > 0):
+                # 创建新模型条目
+                new_model = json.loads(json.dumps(template_model))  # 深拷贝
+                new_model[0] = model_name  # name
+                new_model[3] = model['display_name']  # display name
+                new_model[4] = model['description']  # description
+
+                # 添加到开头
+                models_array.insert(0, new_model)
+                logger.info(f"✅ 注入模型: {model['display_name']}")
+
+        return json_data
+
+    except Exception as e:
+        logger.error(f"注入模型到响应时发生错误: {e}")
+        return json_data
+
+
+def _find_model_list_array(obj):
+    """递归查找模型列表数组"""
+    if not obj:
+        return None
+
+    # 检查是否是模型数组
+    if isinstance(obj, list) and len(obj) > 0:
+        if all(isinstance(item, list) and len(item) > 0 and
+               isinstance(item[0], str) and item[0].startswith('models/')
+               for item in obj):
+            return obj
+
+    # 递归搜索
+    if isinstance(obj, dict):
+        for value in obj.values():
+            result = _find_model_list_array(value)
+            if result:
+                return result
+    elif isinstance(obj, list):
+        for item in obj:
+            result = _find_model_list_array(item)
+            if result:
+                return result
+
+    return None
+
+
+def _find_template_model(models_array):
+    """查找模板模型"""
+    if not models_array:
+        return None
+
+    # 寻找包含 'flash' 或 'pro' 的模型作为模板
+    for model in models_array:
+        if isinstance(model, list) and len(model) > 7:
+            model_name = model[0] if len(model) > 0 else ""
+            if 'flash' in model_name.lower() or 'pro' in model_name.lower():
+                return model
+
+    # 如果没找到，返回第一个有效模型
+    for model in models_array:
+        if isinstance(model, list) and len(model) > 7:
+            return model
+
+    return None
+
+
+async def _add_init_scripts_to_context(context: AsyncBrowserContext):
+    """在浏览器上下文中添加初始化脚本（备用方案）"""
+    try:
+        from config.settings import USERSCRIPT_PATH
+
+        # 检查脚本文件是否存在
+        if not os.path.exists(USERSCRIPT_PATH):
+            logger.info(f"脚本文件不存在，跳过脚本注入: {USERSCRIPT_PATH}")
+            return
+
+        # 读取脚本内容
+        with open(USERSCRIPT_PATH, 'r', encoding='utf-8') as f:
+            script_content = f.read()
+
+        # 清理UserScript头部
+        cleaned_script = _clean_userscript_headers(script_content)
+
+        # 添加到上下文的初始化脚本
+        await context.add_init_script(cleaned_script)
+        logger.info(f"✅ 已将脚本添加到浏览器上下文初始化脚本: {os.path.basename(USERSCRIPT_PATH)}")
+
+    except Exception as e:
+        logger.error(f"添加初始化脚本到上下文时发生错误: {e}")
+
+
+def _clean_userscript_headers(script_content: str) -> str:
+    """清理UserScript头部信息"""
+    lines = script_content.split('\n')
+    cleaned_lines = []
+    in_userscript_block = False
+
+    for line in lines:
+        if line.strip().startswith('// ==UserScript=='):
+            in_userscript_block = True
+            continue
+        elif line.strip().startswith('// ==/UserScript=='):
+            in_userscript_block = False
+            continue
+        elif in_userscript_block:
+            continue
+        else:
+            cleaned_lines.append(line)
+
+    return '\n'.join(cleaned_lines)
+
+
 async def _initialize_page_logic(browser: AsyncBrowser):
     """初始化页面逻辑，连接到现有浏览器"""
     logger.info("--- 初始化页面逻辑 (连接到现有浏览器) ---")
@@ -74,6 +305,10 @@ async def _initialize_page_logic(browser: AsyncBrowser):
         logger.info("   (浏览器上下文将忽略 HTTPS 错误)")
         
         temp_context = await browser.new_context(**context_options)
+
+        # 设置网络拦截和脚本注入
+        await _setup_network_interception_and_scripts(temp_context)
+
         found_page: Optional[AsyncPage] = None
         pages = temp_context.pages
         target_url_base = f"https://{AI_STUDIO_URL_PATTERN}"
@@ -181,6 +416,9 @@ async def _initialize_page_logic(browser: AsyncBrowser):
             
             result_page_instance = found_page
             result_page_ready = True
+
+            # 脚本注入已在上下文创建时完成，无需在此处重复注入
+
             logger.info(f"✅ 页面逻辑初始化成功。")
             return result_page_instance, result_page_ready
         except Exception as input_visible_err:

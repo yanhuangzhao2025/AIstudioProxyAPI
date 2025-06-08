@@ -5,6 +5,7 @@ import asyncio
 import time
 import json
 import os
+import re
 import logging
 from typing import Optional, Any, List, Dict, Callable, Set
 
@@ -52,6 +53,104 @@ async def get_raw_text_content(response_element: Locator, previous_text: str, re
             preview = raw_text[:100].replace('\n', '\\n')
             logger.debug(f"[{req_id}] (获取原始文本) 文本已更新，长度: {len(raw_text)}，预览: '{preview}...'")
     return raw_text
+
+def _parse_userscript_models(script_content: str):
+    """从油猴脚本中解析模型列表 - 简化版本"""
+    try:
+        # 查找所有 name: 'models/xxx' 的行（使用单引号）
+        name_pattern = r"name:\s*'(models/[^']+)'"
+        name_matches = re.findall(name_pattern, script_content)
+
+        if not name_matches:
+            return []
+
+        models = []
+        for name in name_matches:
+            # 为每个找到的模型创建基本信息
+            simple_name = name[7:]  # 移除 'models/' 前缀
+            display_name = simple_name.replace('-', ' ').replace('ab test', '').replace('  ', ' ').title().strip()
+
+            models.append({
+                'name': name,
+                'displayName': f"🤖 {display_name}",
+                'description': f"Model from userscript: {simple_name}"
+            })
+
+        return models
+
+    except Exception as e:
+        logger.error(f"解析油猴脚本模型列表失败: {e}")
+        return []
+
+
+def _get_injected_models():
+    """从油猴脚本中获取注入的模型列表，转换为API格式"""
+    try:
+        # 直接读取环境变量，避免复杂的导入
+        enable_injection = os.environ.get('ENABLE_SCRIPT_INJECTION', 'true').lower() in ('true', '1', 'yes')
+
+        if not enable_injection:
+            return []
+
+        # 获取脚本文件路径
+        script_path = os.environ.get('USERSCRIPT_PATH', 'browser_utils/more_modles.js')
+
+        # 检查脚本文件是否存在
+        if not os.path.exists(script_path):
+            # 脚本文件不存在，静默返回空列表
+            return []
+
+        # 读取油猴脚本内容
+        with open(script_path, 'r', encoding='utf-8') as f:
+            script_content = f.read()
+
+        # 从脚本中解析模型列表
+        models = _parse_userscript_models(script_content)
+
+        if not models:
+            return []
+
+        # 转换为API格式
+        injected_models = []
+        for model in models:
+            model_name = model.get('name', '')
+            if not model_name:
+                continue  # 跳过没有名称的模型
+
+            if model_name.startswith('models/'):
+                simple_id = model_name[7:]  # 移除 'models/' 前缀
+            else:
+                simple_id = model_name
+
+            display_name = model.get('displayName', model.get('display_name', simple_id))
+            description = model.get('description', f'Injected model: {simple_id}')
+
+            # 清理显示名称中的模板字符串
+            display_name = re.sub(r'\$\{[^}]+\}', '', display_name)
+            display_name = re.sub(r'\(Script [^)]+\)', '', display_name).strip()
+
+            model_entry = {
+                "id": simple_id,
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "ai_studio_injected",
+                "display_name": display_name,
+                "description": description,
+                "raw_model_path": model_name,
+                "default_temperature": 1.0,
+                "default_max_output_tokens": 65536,
+                "supported_max_output_tokens": 65536,
+                "default_top_p": 0.95,
+                "injected": True  # 标记为注入的模型
+            }
+            injected_models.append(model_entry)
+
+        return injected_models
+
+    except Exception as e:
+        # 静默处理错误，不输出日志，返回空列表
+        return []
+
 
 async def _handle_model_list_response(response: Any):
     """处理模型列表响应"""
@@ -236,6 +335,13 @@ async def _handle_model_list_response(response: Any):
                         logger.debug(f"Skipping entry due to invalid model_id_path: {model_id_path_str} from entry {str(entry_in_container)[:100]}")
                 
                 if new_parsed_list:
+                    # 尝试添加注入的模型到解析列表
+                    injected_models = _get_injected_models()
+                    if injected_models:
+                        new_parsed_list.extend(injected_models)
+                        if not is_in_login_flow:
+                            logger.info(f"添加了 {len(injected_models)} 个注入的模型到API模型列表")
+
                     server.parsed_model_list = sorted(new_parsed_list, key=lambda m: m.get('display_name', '').lower())
                     server.global_model_list_raw_json = json.dumps({"data": server.parsed_model_list, "object": "list"})
                     if DEBUG_LOGS_ENABLED:
@@ -243,7 +349,7 @@ async def _handle_model_list_response(response: Any):
                         for i, item in enumerate(server.parsed_model_list[:min(3, len(server.parsed_model_list))]):
                             log_output += f"  Model {i+1}: ID={item.get('id')}, Name={item.get('display_name')}, Temp={item.get('default_temperature')}, MaxTokDef={item.get('default_max_output_tokens')}, MaxTokSup={item.get('supported_max_output_tokens')}, TopP={item.get('default_top_p')}\n"
                         logger.info(log_output)
-                    if model_list_fetch_event and not model_list_fetch_event.is_set(): 
+                    if model_list_fetch_event and not model_list_fetch_event.is_set():
                         model_list_fetch_event.set()
                 elif not server.parsed_model_list:
                     logger.warning("解析后模型列表仍然为空。")
