@@ -193,10 +193,10 @@ cp .env.docker .env
 nano .env  # 编辑配置
 
 # 2. 使用 Docker Compose 启动
-docker-compose up -d
+docker compose up -d
 
-# 3. 版本更新
-cd .. && git pull && cd docker && docker-compose up -d --build
+# 3. 版本更新 (在 docker 目录下)
+bash update.sh
 ```
 
 ### 详细文档
@@ -206,8 +206,8 @@ cd .. && git pull && cd docker && docker-compose up -d --build
 
 ### 重要说明
 
-- ✅ **配置统一**: Docker 和本地环境使用相同的 `.env` 配置方式
-- ✅ **版本更新**: `git pull` + `docker-compose up -d --build` 即可完成更新
+- ✅ **配置统一**: 使用 `.env` 文件管理所有配置
+- ✅ **版本更新**: `bash update.sh` 即可完成更新
 - ✅ **目录整洁**: Docker 文件已移至 `docker/` 目录
 - ⚠️ **认证文件**: 首次运行需要在主机上获取认证文件，然后挂载到容器中
 

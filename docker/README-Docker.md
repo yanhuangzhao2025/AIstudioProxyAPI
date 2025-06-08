@@ -56,11 +56,11 @@ Docker Compose 提供了更简洁的配置管理方式，特别适合使用 `.en
 
 ```bash
 # 1. 准备配置文件 (进入 docker 目录)
+cd docker
 cp .env.docker .env
 # 编辑 .env 文件以适应您的需求
 
-# 2. 使用 Docker Compose 启动 (进入 docker 目录)
-cd docker
+# 2. 使用 Docker Compose 启动 (在 docker 目录下)
 docker compose up -d
 
 # 3. 查看日志
@@ -80,11 +80,11 @@ docker compose down
 docker run -d \
     -p <宿主机_服务端口>:2048 \
     -p <宿主机_流端口>:3120 \
-    -v "$(pwd)/auth_profiles":/app/auth_profiles \
+    -v "$(pwd)/../auth_profiles":/app/auth_profiles \
     -v "$(pwd)/.env":/app/.env \
     # 可选: 如果您想使用自己的 SSL/TLS 证书，请取消下面一行的注释。
     # 请确保宿主机上的 'certs/' 目录存在，并且其中包含应用程序所需的证书文件。
-    # -v "$(pwd)/certs":/app/certs \
+    # -v "$(pwd)/../certs":/app/certs \
     --name ai-studio-proxy-container \
     ai-studio-proxy:latest
 ```
@@ -150,7 +150,7 @@ docker run -d \
 
 1. **创建 `.env` 配置文件 (推荐):**
    ```bash
-   # 复制配置模板 (在项目docker目录下执行)
+   # 复制配置模板 (在项目 docker 目录下执行)
    cp .env.docker .env
 
    # 编辑配置文件
@@ -225,7 +225,7 @@ DEFAULT_TOP_P=0.95
 docker run -d \
     -p 8080:2048 \
     -p 8081:3120 \
-    -v "$(pwd)/auth_profiles":/app/auth_profiles \
+    -v "$(pwd)/../auth_profiles":/app/auth_profiles \
     -v "$(pwd)/.env":/app/.env \
     --name ai-studio-proxy-container \
     ai-studio-proxy:latest
@@ -328,7 +328,7 @@ docker run -d \
 
 现在 Docker 部署完全支持 `.env` 文件配置管理：
 
-✅ **统一配置**: 主机和 Docker 环境使用相同的 `.env` 配置文件
+✅ **统一配置**: 使用 `.env` 文件管理所有配置
 ✅ **版本更新无忧**: `git pull` + `docker compose up -d` 即可完成更新
 ✅ **配置隔离**: 开发、测试、生产环境可使用不同的 `.env` 文件
 ✅ **安全性**: `.env` 文件不会被提交到版本控制
@@ -346,10 +346,7 @@ cp .env.docker .env
 docker compose up -d
 
 # 3. 版本更新
-cd ..  # 回到项目根目录
-git pull
-cd docker
-docker compose up -d --build
+bash update.sh
 
 # 4. 查看状态
 docker compose ps
