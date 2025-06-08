@@ -1,19 +1,31 @@
-# Docker 部署教程 (AI Studio Proxy API)
+# Docker 部署指南 (AI Studio Proxy API)
 
 > 📁 **注意**: 所有 Docker 相关文件现在都位于 `docker/` 目录中，保持项目根目录的整洁。
 
-本文档提供了使用 Docker 构建和运行 AI Studio Proxy API 项目的详细步骤。
+本文档提供了使用 Docker 构建和运行 AI Studio Proxy API 项目的完整指南，包括最新的 `.env` 配置管理和脚本注入功能。
 
-**先决条件:**
-*   确保您的系统已正确安装并正在运行 Docker。您可以从 [Docker 官方网站](https://www.docker.com/get-started) 下载并安装 Docker Desktop (适用于 Windows 和 macOS) 或 Docker Engine (适用于 Linux)。
-*   项目代码已下载到本地。
-*   **重要**: 首次运行需要在主机上完成认证文件获取，Docker环境目前仅支持日常运行。
+## 概述
 
-**Docker 环境说明:**
+Docker 部署提供了以下优势：
+- ✅ **环境隔离**: 容器化部署，避免环境冲突
+- ✅ **统一配置**: 基于 `.env` 文件的配置管理
+- ✅ **版本更新无忧**: `bash update.sh` 即可完成更新
+- ✅ **跨平台支持**: 支持 x86_64 和 ARM64 架构
+- ✅ **配置持久化**: 认证文件和日志持久化存储
+
+## 先决条件
+
+*   **Docker**: 确保您的系统已正确安装并正在运行 Docker。您可以从 [Docker 官方网站](https://www.docker.com/get-started) 下载并安装 Docker Desktop (适用于 Windows 和 macOS) 或 Docker Engine (适用于 Linux)。
+*   **项目代码**: 项目代码已下载到本地。
+*   **认证文件**: 首次运行需要在主机上完成认证文件获取，Docker环境目前仅支持日常运行。
+
+## Docker 环境规格
+
 *   **基础镜像**: Python 3.10-slim-bookworm (稳定且轻量)
 *   **Python版本**: 3.10 (在容器内运行，与主机Python版本无关)
-*   **兼容性**: 支持 x86_64 和 ARM64 架构
+*   **架构支持**: x86_64 和 ARM64 (Apple Silicon)
 *   **依赖管理**: 容器内自动安装所有必需依赖
+*   **模块化设计**: 完全支持项目的模块化架构
 
 ## 1. 理解项目中的 Docker 相关文件
 
@@ -204,10 +216,10 @@ AUTO_CONFIRM_LOGIN=true
 AUTO_SAVE_AUTH=false
 AUTH_SAVE_TIMEOUT=30
 
-# 脚本注入配置
+# 脚本注入配置 (v3.0)
 ENABLE_SCRIPT_INJECTION=true
 USERSCRIPT_PATH=browser_utils/more_modles.js
-MODEL_CONFIG_PATH=browser_utils/model_configs.json
+# 注意：MODEL_CONFIG_PATH 已废弃，现在直接从油猴脚本解析模型数据
 
 # API 默认参数
 DEFAULT_TEMPERATURE=1.0
@@ -320,11 +332,17 @@ docker run -d \
 
 希望本教程能帮助您成功地通过 Docker 部署和运行 AI Studio Proxy API 项目！
 
-## 脚本注入配置 (新功能)
+## 脚本注入配置 (v3.0 新功能) 🆕
 
 ### 概述
 
-Docker 环境现在支持油猴脚本动态注入功能，可以增强 AI Studio 的模型列表。
+Docker 环境完全支持最新的脚本注入功能 v3.0，提供以下特性：
+
+- **🚀 Playwright 原生拦截**: 使用 Playwright 路由拦截，100% 可靠
+- **🔄 双重保障机制**: 网络拦截 + 脚本注入，确保万无一失
+- **📝 直接脚本解析**: 从油猴脚本中自动解析模型列表
+- **🔗 前后端同步**: 前端和后端使用相同的模型数据源
+- **⚙️ 零配置维护**: 无需手动维护模型配置文件
 
 ### 配置选项
 
