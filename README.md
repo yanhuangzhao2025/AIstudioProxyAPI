@@ -41,6 +41,7 @@ This project is generously sponsored by ZMTO. Visit their website: [https://zmto
 *   **参数控制**: 支持 `temperature`, `max_output_tokens`, `top_p`, `stop` 等参数
 *   **反指纹检测**: 使用 Camoufox 降低被检测为自动化脚本的风险
 *   **多种响应获取方式**: 集成流式代理、外部 Helper 服务、Playwright 页面交互
+*   **脚本注入功能**: 支持油猴脚本动态挂载，增强模型列表和功能扩展 🆕
 *   **Web UI**: 内置现代化的测试界面，支持聊天、状态监控、安全的API密钥管理
 *   **图形界面启动器**: 提供 GUI 启动器，简化配置和管理
 *   **灵活的认证系统**: 支持可选的API密钥认证，兼容OpenAI标准的Bearer token
@@ -67,6 +68,7 @@ graph TD
         Routes["api_utils/routes.py"]
         RequestProcessor["api_utils/request_processor.py"]
         PageController["browser_utils/page_controller.py"]
+        ScriptManager["browser_utils/script_manager.py (Script Injection)"]
         StreamProxy["stream/ (Proxy Server)"]
     end
 
@@ -94,6 +96,8 @@ graph TD
     RequestProcessor -- "控制浏览器 (Controls Browser)" --> PageController
     RequestProcessor -- "通过代理 (Uses Proxy)" --> StreamProxy
 
+    PageController -- "脚本注入 (Script Injection)" --> ScriptManager
+    ScriptManager -- "增强功能 (Enhances)" --> CamoufoxInstance
     PageController -- "自动化 (Automates)" --> CamoufoxInstance
     CamoufoxInstance -- "访问 (Accesses)" --> AI_Studio
     StreamProxy -- "转发请求 (Forwards Request)" --> AI_Studio
@@ -161,6 +165,7 @@ python launch_camoufox.py --headless
 - [Web UI使用指南](docs/webui-guide.md) - Web界面功能说明
 - [故障排除指南](docs/troubleshooting.md) - 常见问题解决方案
 - [高级配置指南](docs/advanced-configuration.md) - 高级功能和配置选项
+- [脚本注入指南](docs/script_injection_guide.md) - 油猴脚本动态挂载功能使用指南 🆕
 - [日志控制指南](docs/logging-control.md) - 日志系统配置和调试
 - [依赖版本说明](docs/dependency-versions.md) - Python版本要求和依赖兼容性详解
 

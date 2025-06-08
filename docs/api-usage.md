@@ -222,6 +222,31 @@ else:
 *   返回 AI Studio 页面上检测到的可用模型列表，以及一个代理本身的默认模型条目。
 *   现在会尝试从 AI Studio 动态获取模型列表。如果获取失败，会返回一个后备模型。
 *   支持 [`excluded_models.txt`](../excluded_models.txt) 文件，用于从列表中排除特定的模型ID。
+*   **🆕 脚本注入模型**: 如果启用了脚本注入功能，列表中还会包含通过油猴脚本注入的自定义模型，这些模型会标记为 `"injected": true`。
+
+**脚本注入模型特点**:
+- 模型ID格式：注入的模型会自动移除 `models/` 前缀，如 `models/kingfall-ab-test` 变为 `kingfall-ab-test`
+- 标识字段：包含 `"injected": true` 字段用于识别
+- 所有者标识：`"owned_by": "ai_studio_injected"`
+- 完全兼容：可以像普通模型一样通过 API 调用
+
+**示例响应**:
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "kingfall-ab-test",
+      "object": "model",
+      "created": 1703123456,
+      "owned_by": "ai_studio_injected",
+      "display_name": "👑 Kingfall",
+      "description": "Kingfall model - Advanced reasoning capabilities",
+      "injected": true
+    }
+  ]
+}
+```
 
 ### API 信息
 
@@ -310,6 +335,8 @@ else:
 *   Web UI 的"模型设置"面板的参数配置也主要影响通过 Playwright 页面交互获取响应的场景。
 
 *   项目根目录下的 [`excluded_models.txt`](../excluded_models.txt) 文件可用于从 `/v1/models` 端点返回的列表中排除特定的模型 ID。
+
+*   **🆕 脚本注入功能**: 通过启用脚本注入功能，可以动态添加自定义模型到模型列表中。详见 [脚本注入指南](script_injection_guide.md)。
 
 ### 客户端管理历史
 
