@@ -432,6 +432,8 @@ class PageController:
                     continue
                 else:
                     raise
+            finally:
+
 
             await self._check_disconnect(check_client_disconnected, f"清空聊天 - 消失检查尝试 {attempt_disappear + 1} 后")
 
@@ -493,11 +495,6 @@ class PageController:
                     # 4. 设置要上传的文件
                     await file_chooser.set_files(image_list)
                     print(f"已将 '{image_list}' 设置到文件选择器。")
-
-
-
-                    # 如果页面还有独立的“确认上传”按钮，你需要点击它
-                    # 比如： await page.locator("#confirmUploadButton").click()
 
                 except Exception as e:
                     print(f"在上传文件时发生错误: {e}")
