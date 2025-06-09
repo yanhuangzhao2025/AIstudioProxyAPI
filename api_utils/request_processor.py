@@ -96,6 +96,44 @@ async def _analyze_model_requirements(req_id: str, context: dict, request: ChatC
     return context
 
 
+async def _test_client_connection(req_id: str, http_request: Request) -> bool:
+    """通过发送测试数据包来主动检测客户端连接状态"""
+    try:
+        # 尝试发送一个小的测试数据包
+        test_chunk = "data: {\"type\":\"ping\"}\n\n"
+
+        # 获取底层的响应对象
+        if hasattr(http_request, '_receive'):
+            # 检查接收通道是否还活跃
+            try:
+                # 尝试非阻塞地检查是否有断开消息
+                import asyncio
+                receive_task = asyncio.create_task(http_request._receive())
+                done, pending = await asyncio.wait([receive_task], timeout=0.01)
+
+                if done:
+                    message = receive_task.result()
+                    if message.get("type") == "http.disconnect":
+                        return False
+                else:
+                    # 取消未完成的任务
+                    receive_task.cancel()
+                    try:
+                        await receive_task
+                    except asyncio.CancelledError:
+                        pass
+
+            except Exception:
+                # 如果检查过程中出现异常，可能表示连接有问题
+                return False
+
+        # 如果上述检查都通过，认为连接正常
+        return True
+
+    except Exception as e:
+        # 任何异常都认为连接已断开
+        return False
+
 async def _setup_disconnect_monitoring(req_id: str, http_request: Request, result_future: Future) -> Tuple[Event, asyncio.Task, Callable]:
     """设置客户端断开连接监控"""
     from server import logger
@@ -105,13 +143,24 @@ async def _setup_disconnect_monitoring(req_id: str, http_request: Request, resul
     async def check_disconnect_periodically():
         while not client_disconnected_event.is_set():
             try:
-                if await http_request.is_disconnected():
-                    logger.info(f"[{req_id}] 客户端断开，设置事件。")
+                # 使用主动检测方法
+                is_connected = await _test_client_connection(req_id, http_request)
+                if not is_connected:
+                    logger.info(f"[{req_id}] 主动检测到客户端断开连接。")
                     client_disconnected_event.set()
                     if not result_future.done():
                         result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端关闭了请求"))
                     break
-                await asyncio.sleep(0.5)  # 更频繁的检查间隔，从1.0秒改为0.5秒
+
+                # 备用检查：使用原有的is_disconnected方法
+                if await http_request.is_disconnected():
+                    logger.info(f"[{req_id}] 备用检测到客户端断开连接。")
+                    client_disconnected_event.set()
+                    if not result_future.done():
+                        result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端关闭了请求"))
+                    break
+
+                await asyncio.sleep(0.3)  # 更频繁的检查间隔，从0.5秒改为0.3秒
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -755,7 +804,16 @@ async def _process_request_refactored(
     result_future: Future
 ) -> Optional[Tuple[Event, Locator, Callable[[str], bool]]]:
     """核心请求处理函数 - 重构版本"""
-    
+
+    # 优化：在开始任何处理前主动检测客户端连接状态
+    is_connected = await _test_client_connection(req_id, http_request)
+    if not is_connected:
+        from server import logger
+        logger.info(f"[{req_id}] ✅ 核心处理前检测到客户端断开，提前退出节省资源")
+        if not result_future.done():
+            result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端在处理开始前已断开连接"))
+        return None
+
     context = await _initialize_request_context(req_id, request)
     context = await _analyze_model_requirements(req_id, context, request)
     
@@ -788,7 +846,10 @@ async def _process_request_refactored(
             context['parsed_model_list'],
             check_client_disconnected
         )
-        
+
+        # 优化：在提交提示前再次检查客户端连接，避免不必要的后台请求
+        check_client_disconnected("提交提示前最终检查")
+
         await page_controller.submit_prompt(prepared_prompt, check_client_disconnected)
         
         # 响应处理仍然需要在这里，因为它决定了是流式还是非流式，并设置future

@@ -100,16 +100,26 @@ async def queue_worker():
             request_data = request_item["request_data"]
             http_request = request_item["http_request"]
             result_future = request_item["result_future"]
-            
+
             if request_item.get("cancelled", False):
                 logger.info(f"[{req_id}] (Worker) 请求已取消，跳过。")
                 if not result_future.done():
                     result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 请求已被用户取消"))
                 request_queue.task_done()
                 continue
-            
+
             is_streaming_request = request_data.stream
             logger.info(f"[{req_id}] (Worker) 取出请求。模式: {'流式' if is_streaming_request else '非流式'}")
+
+            # 优化：在开始处理前主动检测客户端连接状态，避免不必要的处理
+            from api_utils.request_processor import _test_client_connection
+            is_connected = await _test_client_connection(req_id, http_request)
+            if not is_connected:
+                logger.info(f"[{req_id}] (Worker) ✅ 主动检测到客户端已断开，跳过处理节省资源")
+                if not result_future.done():
+                    result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端在处理前已断开连接"))
+                request_queue.task_done()
+                continue
             
             # 流式请求间隔控制
             current_time = time.time()
@@ -118,8 +128,10 @@ async def queue_worker():
                 logger.info(f"[{req_id}] (Worker) 连续流式请求，添加 {delay_time:.2f}s 延迟...")
                 await asyncio.sleep(delay_time)
             
-            if await http_request.is_disconnected():
-                logger.info(f"[{req_id}] (Worker) 客户端在等待锁时断开。取消。")
+            # 等待锁前再次主动检测客户端连接
+            is_connected = await _test_client_connection(req_id, http_request)
+            if not is_connected:
+                logger.info(f"[{req_id}] (Worker) ✅ 等待锁时检测到客户端断开，取消处理")
                 if not result_future.done():
                     result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端关闭了请求"))
                 request_queue.task_done()
@@ -129,8 +141,10 @@ async def queue_worker():
             async with processing_lock:
                 logger.info(f"[{req_id}] (Worker) 已获取处理锁。开始核心处理...")
                 
-                if await http_request.is_disconnected():
-                    logger.info(f"[{req_id}] (Worker) 客户端在获取锁后断开。取消。")
+                # 获取锁后最终主动检测客户端连接
+                is_connected = await _test_client_connection(req_id, http_request)
+                if not is_connected:
+                    logger.info(f"[{req_id}] (Worker) ✅ 获取锁后检测到客户端断开，取消处理")
                     if not result_future.done():
                         result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端关闭了请求"))
                 elif result_future.done():
@@ -172,15 +186,16 @@ async def queue_worker():
                                 nonlocal client_disconnected_early
                                 while not completion_event.is_set():
                                     try:
-                                        # 检查客户端是否断开连接
-                                        if await http_request.is_disconnected():
-                                            logger.info(f"[{req_id}] (Worker) 检测到客户端断开连接，提前触发done信号")
+                                        # 主动检查客户端是否断开连接
+                                        is_connected = await _test_client_connection(req_id, http_request)
+                                        if not is_connected:
+                                            logger.info(f"[{req_id}] (Worker) ✅ 流式处理中检测到客户端断开，提前触发done信号")
                                             client_disconnected_early = True
                                             # 立即设置completion_event以提前结束等待
                                             if not completion_event.is_set():
                                                 completion_event.set()
                                             break
-                                        await asyncio.sleep(0.5)  # 更频繁的检查间隔
+                                        await asyncio.sleep(0.3)  # 更频繁的检查间隔
                                     except Exception as e:
                                         logger.error(f"[{req_id}] (Worker) 增强断开检测器错误: {e}")
                                         break
