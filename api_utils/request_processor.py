@@ -99,9 +99,9 @@ async def _analyze_model_requirements(req_id: str, context: dict, request: ChatC
 async def _setup_disconnect_monitoring(req_id: str, http_request: Request, result_future: Future) -> Tuple[Event, asyncio.Task, Callable]:
     """设置客户端断开连接监控"""
     from server import logger
-    
+
     client_disconnected_event = Event()
-    
+
     async def check_disconnect_periodically():
         while not client_disconnected_event.is_set():
             try:
@@ -111,7 +111,7 @@ async def _setup_disconnect_monitoring(req_id: str, http_request: Request, resul
                     if not result_future.done():
                         result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端关闭了请求"))
                     break
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(0.5)  # 更频繁的检查间隔，从1.0秒改为0.5秒
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -120,15 +120,15 @@ async def _setup_disconnect_monitoring(req_id: str, http_request: Request, resul
                 if not result_future.done():
                     result_future.set_exception(HTTPException(status_code=500, detail=f"[{req_id}] Internal disconnect checker error: {e}"))
                 break
-    
+
     disconnect_check_task = asyncio.create_task(check_disconnect_periodically())
-    
+
     def check_client_disconnected(stage: str = ""):
         if client_disconnected_event.is_set():
             logger.info(f"[{req_id}] 在 '{stage}' 检测到客户端断开连接。")
             raise ClientDisconnectedError(f"[{req_id}] Client disconnected at stage: {stage}")
         return False
-    
+
     return client_disconnected_event, disconnect_check_task, check_client_disconnected
 
 
@@ -255,18 +255,28 @@ async def _handle_auxiliary_stream_response(req_id: str, request: ChatCompletion
                 model_name_for_stream = current_ai_studio_model_id or MODEL_NAME
                 chat_completion_id = f"{CHAT_COMPLETION_ID_PREFIX}{req_id}-{int(time.time())}-{random.randint(100, 999)}"
                 created_timestamp = int(time.time())
-                
+
                 # 用于收集完整内容以计算usage
                 full_reasoning_content = ""
                 full_body_content = ""
 
+                # 数据接收状态标记
+                data_receiving = False
+
                 try:
                     async for raw_data in use_stream_response(req_id):
+                        # 标记数据接收状态
+                        data_receiving = True
+
                         # 检查客户端是否断开连接
                         try:
                             check_client_disconnected(f"流式生成器循环 ({req_id}): ")
                         except ClientDisconnectedError:
                             logger.info(f"[{req_id}] 客户端断开连接，终止流式生成")
+                            # 如果正在接收数据时客户端断开，立即设置done信号
+                            if data_receiving and not event_to_set.is_set():
+                                logger.info(f"[{req_id}] 数据接收中客户端断开，立即设置done信号")
+                                event_to_set.set()
                             break
                         
                         # 确保 data 是字典类型
@@ -403,6 +413,10 @@ async def _handle_auxiliary_stream_response(req_id: str, request: ChatCompletion
                 
                 except ClientDisconnectedError:
                     logger.info(f"[{req_id}] 流式生成器中检测到客户端断开连接")
+                    # 客户端断开时立即设置done信号
+                    if data_receiving and not event_to_set.is_set():
+                        logger.info(f"[{req_id}] 客户端断开异常处理中立即设置done信号")
+                        event_to_set.set()
                 except Exception as e:
                     logger.error(f"[{req_id}] 流式生成器处理过程中发生错误: {e}", exc_info=True)
                     # 发送错误信息给客户端
@@ -605,11 +619,17 @@ async def _handle_playwright_response(req_id: str, request: ChatCompletionReques
         completion_event = Event()
 
         async def create_response_stream_generator():
+            # 数据接收状态标记
+            data_receiving = False
+
             try:
                 # 使用PageController获取响应
                 page_controller = PageController(page, logger, req_id)
                 final_content = await page_controller.get_response(check_client_disconnected)
-                
+
+                # 标记数据接收状态
+                data_receiving = True
+
                 # 生成流式响应 - 保持Markdown格式
                 # 按行分割以保持换行符和Markdown结构
                 lines = final_content.split('\n')
@@ -619,6 +639,10 @@ async def _handle_playwright_response(req_id: str, request: ChatCompletionReques
                         check_client_disconnected(f"Playwright流式生成器循环 ({req_id}): ")
                     except ClientDisconnectedError:
                         logger.info(f"[{req_id}] Playwright流式生成器中检测到客户端断开连接")
+                        # 如果正在接收数据时客户端断开，立即设置done信号
+                        if data_receiving and not completion_event.is_set():
+                            logger.info(f"[{req_id}] Playwright数据接收中客户端断开，立即设置done信号")
+                            completion_event.set()
                         break
 
                     # 输出当前行的内容（包括空行，以保持Markdown格式）
@@ -647,6 +671,10 @@ async def _handle_playwright_response(req_id: str, request: ChatCompletionReques
                 
             except ClientDisconnectedError:
                 logger.info(f"[{req_id}] Playwright流式生成器中检测到客户端断开连接")
+                # 客户端断开时立即设置done信号
+                if data_receiving and not completion_event.is_set():
+                    logger.info(f"[{req_id}] Playwright客户端断开异常处理中立即设置done信号")
+                    completion_event.set()
             except Exception as e:
                 logger.error(f"[{req_id}] Playwright流式生成器处理过程中发生错误: {e}", exc_info=True)
                 # 发送错误信息给客户端
