@@ -361,12 +361,22 @@ async def _handle_model_list_response(response: Any):
                         logger.debug(f"Skipping entry due to invalid model_id_path: {model_id_path_str} from entry {str(entry_in_container)[:100]}")
                 
                 if new_parsed_list:
-                    # 尝试添加注入的模型到解析列表
-                    injected_models = _get_injected_models()
-                    if injected_models:
-                        new_parsed_list.extend(injected_models)
-                        if not is_in_login_flow:
-                            logger.info(f"添加了 {len(injected_models)} 个注入的模型到API模型列表")
+                    # 检查是否已经有通过网络拦截注入的模型
+                    has_network_injected_models = False
+                    if models_array_container:
+                        for entry_in_container in models_array_container:
+                            if isinstance(entry_in_container, list) and len(entry_in_container) > 10:
+                                # 检查是否有网络注入标记
+                                if "__NETWORK_INJECTED__" in entry_in_container:
+                                    has_network_injected_models = True
+                                    break
+
+                    if has_network_injected_models and not is_in_login_flow:
+                        logger.info("检测到网络拦截已注入模型")
+
+                    # 注意：不再在后端添加注入模型
+                    # 因为如果前端没有通过网络拦截注入，说明前端页面上没有这些模型
+                    # 后端返回这些模型也无法实际使用，所以只依赖网络拦截注入
 
                     server.parsed_model_list = sorted(new_parsed_list, key=lambda m: m.get('display_name', '').lower())
                     server.global_model_list_raw_json = json.dumps({"data": server.parsed_model_list, "object": "list"})

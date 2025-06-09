@@ -143,9 +143,19 @@ async def _inject_models_to_response(json_data: dict, url: str) -> dict:
                 new_model[3] = model['display_name']  # display name
                 new_model[4] = model['description']  # description
 
+                # 添加特殊标记，表示这是通过网络拦截注入的模型
+                # 在模型数组的末尾添加一个特殊字段作为标记
+                if len(new_model) > 10:  # 确保有足够的位置
+                    new_model.append("__NETWORK_INJECTED__")  # 添加网络注入标记
+                else:
+                    # 如果模型数组长度不够，扩展到足够长度
+                    while len(new_model) <= 10:
+                        new_model.append(None)
+                    new_model.append("__NETWORK_INJECTED__")
+
                 # 添加到开头
                 models_array.insert(0, new_model)
-                logger.info(f"✅ 注入模型: {model['display_name']}")
+                logger.info(f"✅ 网络拦截注入模型: {model['display_name']}")
 
         return json_data
 
