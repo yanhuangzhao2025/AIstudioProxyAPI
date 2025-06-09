@@ -13,6 +13,8 @@ from models import Message
 import re
 import base64
 import requests
+import os
+import hashlib
 
 
 # --- SSE生成函数 ---
@@ -196,45 +198,48 @@ def validate_chat_request(messages: List[Message], req_id: str) -> Dict[str, Opt
     }
 
 
-def extract_base64_from_data_uri(data_uri: str) -> str:
-    match = re.search(r'base64,(.*)', data_uri)
-    if match:
-        return match.group(1)
-    else:
-        # 如果不是有效的 data:image URI 格式，或者不是 Base64 编码，则抛出错误
-        raise ValueError("Invalid data URI format: 'base64,' not found or malformed.")
+def extract_base64_to_local(base64_data: str) -> str:
+    output_dir = os.path.join(os.path.dirname(__file__), '..', 'upload_images')
+    match = re.match(r"data:image/(\w+);base64,(.*)", base64_data)
+    if not match:
+        print("错误: Base64 数据格式不正确。")
+        return None
 
+    image_type = match.group(1)  # 例如 "png", "jpeg"
+    encoded_image_data = match.group(2)
 
-# --- 辅助函数：将 Base64 字符串解码为二进制数据 ---
-def decode_base64_to_binary(base64_string: str) -> bytes:
     try:
-        return base64.b64decode(base64_string)
+        # 解码 Base64 字符串
+        decoded_image_data = base64.b64decode(encoded_image_data)
     except base64.binascii.Error as e:
-        raise ValueError(f"Base64 decoding failed: {e}")
+        print(f"错误: Base64 解码失败 - {e}")
+        return None
+
+    # 计算图片数据的 MD5 值
+    md5_hash = hashlib.md5(decoded_image_data).hexdigest()
+
+    # 确定文件扩展名和完整文件路径
+    file_extension = f".{image_type}"
+    output_filepath = os.path.join(output_dir, f"{md5_hash}{file_extension}")
+
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+
+    if os.path.exists(output_filepath):
+        print(f"文件已存在，跳过保存: {output_filepath}")
+        return output_filepath
+
+    # 保存图片到文件
+    try:
+        with open(output_filepath, "wb") as f:
+            f.write(decoded_image_data)
+        print(f"图片已成功保存到: {output_filepath}")
+        return output_filepath
+    except IOError as e:
+        print(f"错误: 保存文件失败 - {e}")
+        return None
 
 
-# --- 辅助函数：上传二进制数据到 Imgur ---
-def upload_to_imgur(binary_image_data: bytes, client_id: str) -> str:
-    url = "https://api.imgur.com/3/upload"
-    headers = {
-        'Authorization': f'Client-ID {client_id}'
-    }
-    files = {
-        'image': binary_image_data
-    }
-
-    print("正在上传图片到 Imgur...")
-    response = requests.post(url, headers=headers, files=files)
-    response.raise_for_status()  # 检查 HTTP 错误
-
-    data = response.json()
-
-    if data['success']:
-        image_url = data['data']['link']
-        print(f"Imgur 图片地址: {image_url}")
-        return image_url
-    else:
-        raise Exception(f"Imgur 上传失败: {data['data']}")
 # --- 提示准备函数 ---
 def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
     """准备组合提示"""
@@ -279,6 +284,7 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
         role = msg.role or 'unknown'
         role_prefix_ui = f"{role_map_ui.get(role, role.capitalize())}:\n"
         current_turn_parts = [role_prefix_ui]
+        images_list = []
         
         content = msg.content or ''
         content_str = ""
@@ -298,16 +304,8 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
                     if image_url_value.startswith("data:image/"):
                         try:
                             # 提取 Base64 字符串
-                            pure_base64 = extract_base64_from_data_uri(image_url_value)
-
-                            # 解码为二进制数据
-                            binary_data = decode_base64_to_binary(pure_base64)
-
-                            # 上传到 Imgur
-                            imgur_link = upload_to_imgur(binary_data, "11de2ed591c9ff2")
-
-                            text_parts.append(f"图片地址：{imgur_link}")
-
+                            image_full_path = extract_base64_to_local(image_url_value)
+                            images_list.append(image_full_path)
                         except (ValueError, requests.exceptions.RequestException, Exception) as e:
                             print(f"处理 Base64 图片并上传到 Imgur 失败: {e}")
                 else:
@@ -360,7 +358,7 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
     preview_text = final_prompt[:300].replace('\n', '\\n')
     logger.info(f"[{req_id}] (准备提示) 组合提示长度: {len(final_prompt)}。预览: '{preview_text}...'")
     
-    return final_prompt 
+    return final_prompt,images_list
 
 
 def estimate_tokens(text: str) -> int:

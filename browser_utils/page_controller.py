@@ -12,7 +12,7 @@ from config import (
     MAT_CHIP_REMOVE_BUTTON_SELECTOR, TOP_P_INPUT_SELECTOR, SUBMIT_BUTTON_SELECTOR,
     CLEAR_CHAT_BUTTON_SELECTOR, CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR, OVERLAY_SELECTOR,
     PROMPT_TEXTAREA_SELECTOR, RESPONSE_CONTAINER_SELECTOR, RESPONSE_TEXT_SELECTOR,
-    EDIT_MESSAGE_BUTTON_SELECTOR,USE_URL_CONTEXT_SELECTOR
+    EDIT_MESSAGE_BUTTON_SELECTOR,USE_URL_CONTEXT_SELECTOR,UPLOAD_BUTTON_SELECTOR
 )
 from config import (
     CLICK_TIMEOUT_MS, WAIT_FOR_ELEMENT_TIMEOUT_MS, CLEAR_CHAT_VERIFY_TIMEOUT_MS,
@@ -446,7 +446,7 @@ class PageController:
         except Exception as verify_err:
             self.logger.warning(f"[{self.req_id}] ⚠️ 警告: 清空聊天验证失败 (最后响应容器未隐藏): {verify_err}")
     
-    async def submit_prompt(self, prompt: str, check_client_disconnected: Callable):
+    async def submit_prompt(self, prompt: str,image_list: List, check_client_disconnected: Callable):
         """提交提示到页面。"""
         self.logger.info(f"[{self.req_id}] 填充并提交提示 ({len(prompt)} chars)...")
         prompt_textarea_locator = self.page.locator(PROMPT_TEXTAREA_SELECTOR)
@@ -471,8 +471,39 @@ class PageController:
             await autosize_wrapper_locator.evaluate('(element, text) => { element.setAttribute("data-value", text); }', prompt)
             await self._check_disconnect(check_client_disconnected, "After Input Fill")
 
+            # 上传
+            if len(image_list) > 0:
+                try:
+                    # 1. 监听文件选择器
+                    #    page.expect_file_chooser() 会返回一个上下文管理器
+                    #    当文件选择器出现时，它会得到 FileChooser 对象
+                    function_btn_localtor = self.page.locator('button[aria-label="Insert assets such as images, videos, files, or audio"]')
+                    await function_btn_localtor.click()
+                    asyncio.sleep(0.5)
+                    async with self.page.expect_file_chooser() as fc_info:
+                        # 2. 点击那个会触发文件选择的普通按钮
+                        upload_btn_localtor = self.page.locator(UPLOAD_BUTTON_SELECTOR)
+                        await upload_btn_localtor.click()
+                        print("点击了 JS 上传按钮，等待文件选择器...")
+
+                    # 3. 获取文件选择器对象
+                    file_chooser = await fc_info.value
+                    print("文件选择器已出现。")
+
+                    # 4. 设置要上传的文件
+                    await file_chooser.set_files(image_list)
+                    print(f"已将 '{image_list}' 设置到文件选择器。")
+
+
+
+                    # 如果页面还有独立的“确认上传”按钮，你需要点击它
+                    # 比如： await page.locator("#confirmUploadButton").click()
+
+                except Exception as e:
+                    print(f"在上传文件时发生错误: {e}")
+
             # 等待发送按钮启用
-            wait_timeout_ms_submit_enabled = 40000
+            wait_timeout_ms_submit_enabled = 100000
             try:
                 await self._check_disconnect(check_client_disconnected, "填充提示后等待发送按钮启用 - 前置检查")
                 await expect_async(submit_button_locator).to_be_enabled(timeout=wait_timeout_ms_submit_enabled)

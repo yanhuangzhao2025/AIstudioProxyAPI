@@ -208,10 +208,10 @@ async def _prepare_and_validate_request(req_id: str, request: ChatCompletionRequ
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"[{req_id}] 无效请求: {e}")
     
-    prepared_prompt = prepare_combined_prompt(request.messages, req_id)
+    prepared_prompt,image_list = prepare_combined_prompt(request.messages, req_id)
     check_client_disconnected("After Prompt Prep")
     
-    return prepared_prompt
+    return prepared_prompt,image_list
 
 async def _handle_response_processing(req_id: str, request: ChatCompletionRequest, page: AsyncPage,
                                     context: dict, result_future: Future,
@@ -732,7 +732,7 @@ async def _process_request_refactored(
         await _handle_model_switching(req_id, context, check_client_disconnected)
         await _handle_parameter_cache(req_id, context)
         
-        prepared_prompt = await _prepare_and_validate_request(req_id, request, check_client_disconnected)
+        prepared_prompt,image_list = await _prepare_and_validate_request(req_id, request, check_client_disconnected)
 
         # 使用PageController处理页面交互
         # 注意：聊天历史清空已移至队列处理锁释放后执行
@@ -746,7 +746,7 @@ async def _process_request_refactored(
             check_client_disconnected
         )
         
-        await page_controller.submit_prompt(prepared_prompt, check_client_disconnected)
+        await page_controller.submit_prompt(prepared_prompt,image_list, check_client_disconnected)
         
         # 响应处理仍然需要在这里，因为它决定了是流式还是非流式，并设置future
         response_result = await _handle_response_processing(
