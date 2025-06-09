@@ -12,7 +12,7 @@ from config import (
     MAT_CHIP_REMOVE_BUTTON_SELECTOR, TOP_P_INPUT_SELECTOR, SUBMIT_BUTTON_SELECTOR,
     CLEAR_CHAT_BUTTON_SELECTOR, CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR, OVERLAY_SELECTOR,
     PROMPT_TEXTAREA_SELECTOR, RESPONSE_CONTAINER_SELECTOR, RESPONSE_TEXT_SELECTOR,
-    EDIT_MESSAGE_BUTTON_SELECTOR
+    EDIT_MESSAGE_BUTTON_SELECTOR,USE_URL_CONTEXT_SELECTOR
 )
 from config import (
     CLICK_TIMEOUT_MS, WAIT_FOR_ELEMENT_TIMEOUT_MS, CLEAR_CHAT_VERIFY_TIMEOUT_MS,
@@ -59,6 +59,30 @@ class PageController:
         await self._adjust_top_p(top_p_to_set, check_client_disconnected)
         await self._check_disconnect(check_client_disconnected, "End Parameter Adjustment")
 
+        # 调整URL CONTEXT
+        await self._open_url_content(check_client_disconnected)
+
+    async def _open_url_content(self,check_client_disconnected: Callable):
+        try:
+            collapse_tools_locator = self.page.locator('button[aria-label="Expand or collapse tools"]')
+            grandparent_locator = collapse_tools_locator.locator("xpath=../..")
+
+            # 3. 获取祖父级元素的 class 属性值
+            # get_attribute 返回一个包含所有 class 的字符串，例如 "menu dropdown active"
+            class_string = await grandparent_locator.get_attribute("class")
+
+            # 4. 在 Python 中进行判断
+            # 确保 class_string 不是 None，并且 'expanded' 是一个独立的 class
+            if class_string and "expanded" not in class_string.split():
+                await collapse_tools_locator.click(timeout=CLICK_TIMEOUT_MS)
+                await asyncio.sleep(0.5)
+            use_url_content_selector = self.page.locator(USE_URL_CONTEXT_SELECTOR)
+            is_checked = await use_url_content_selector.get_attribute("aria-checked")
+            if "false" == is_checked:
+                await use_url_content_selector.click(timeout=CLICK_TIMEOUT_MS)
+                await self._check_disconnect(check_client_disconnected, "点击URLCONTEXT")
+        except Exception as e:
+            self.logger.error(f"[{self.req_id}] ❌ 操作USE_URL_CONTEXT_SELECTOR时发生错误:{e}。")
 
     async def _adjust_temperature(self, temperature: float, page_params_cache: dict, params_cache_lock: asyncio.Lock, check_client_disconnected: Callable):
         """调整温度参数。"""
@@ -75,6 +99,7 @@ class PageController:
 
             self.logger.info(f"[{self.req_id}] 请求温度 ({clamped_temp}) 与缓存值 ({cached_temp}) 不一致或缓存中无值。需要与页面交互。")
             temp_input_locator = self.page.locator(TEMPERATURE_INPUT_SELECTOR)
+
 
             try:
                 await expect_async(temp_input_locator).to_be_visible(timeout=5000)

@@ -10,7 +10,9 @@ import datetime
 from typing import Any, Dict, List, Optional, AsyncGenerator
 from asyncio import Queue
 from models import Message
-
+import re
+import base64
+import requests
 
 
 # --- SSE生成函数 ---
@@ -194,6 +196,45 @@ def validate_chat_request(messages: List[Message], req_id: str) -> Dict[str, Opt
     }
 
 
+def extract_base64_from_data_uri(data_uri: str) -> str:
+    match = re.search(r'base64,(.*)', data_uri)
+    if match:
+        return match.group(1)
+    else:
+        # 如果不是有效的 data:image URI 格式，或者不是 Base64 编码，则抛出错误
+        raise ValueError("Invalid data URI format: 'base64,' not found or malformed.")
+
+
+# --- 辅助函数：将 Base64 字符串解码为二进制数据 ---
+def decode_base64_to_binary(base64_string: str) -> bytes:
+    try:
+        return base64.b64decode(base64_string)
+    except base64.binascii.Error as e:
+        raise ValueError(f"Base64 decoding failed: {e}")
+
+
+# --- 辅助函数：上传二进制数据到 Imgur ---
+def upload_to_imgur(binary_image_data: bytes, client_id: str) -> str:
+    url = "https://api.imgur.com/3/upload"
+    headers = {
+        'Authorization': f'Client-ID {client_id}'
+    }
+    files = {
+        'image': binary_image_data
+    }
+
+    print("正在上传图片到 Imgur...")
+    response = requests.post(url, headers=headers, files=files)
+    response.raise_for_status()  # 检查 HTTP 错误
+
+    data = response.json()
+
+    if data['success']:
+        image_url = data['data']['link']
+        print(f"Imgur 图片地址: {image_url}")
+        return image_url
+    else:
+        raise Exception(f"Imgur 上传失败: {data['data']}")
 # --- 提示准备函数 ---
 def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
     """准备组合提示"""
@@ -252,6 +293,23 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
                     text_parts.append(item.text or '')
                 elif isinstance(item, dict) and item.get('type') == 'text':
                     text_parts.append(item.get('text', ''))
+                elif hasattr(item, 'type') and item.type == 'image_url':
+                    image_url_value = item.image_url.url
+                    if image_url_value.startswith("data:image/"):
+                        try:
+                            # 提取 Base64 字符串
+                            pure_base64 = extract_base64_from_data_uri(image_url_value)
+
+                            # 解码为二进制数据
+                            binary_data = decode_base64_to_binary(pure_base64)
+
+                            # 上传到 Imgur
+                            imgur_link = upload_to_imgur(binary_data, "11de2ed591c9ff2")
+
+                            text_parts.append(f"图片地址：{imgur_link}")
+
+                        except (ValueError, requests.exceptions.RequestException, Exception) as e:
+                            print(f"处理 Base64 图片并上传到 Imgur 失败: {e}")
                 else:
                     logger.warning(f"[{req_id}] (准备提示) 警告: 在索引 {i} 的消息中忽略非文本或未知类型的 content item")
             content_str = "\n".join(text_parts).strip()
