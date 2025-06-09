@@ -35,15 +35,18 @@ This project is generously sponsored by ZMTO. Visit their website: [https://zmto
 
 ## 主要特性
 
-*   **OpenAI 兼容 API**: 支持 `/v1/chat/completions` 端点，兼容现有的 OpenAI 客户端
-*   **流式和非流式响应**: 支持实时流式输出和传统的完整响应
-*   **模型切换**: 通过 API 请求中的 `model` 字段动态切换 AI Studio 中的模型
-*   **参数控制**: 支持 `temperature`, `max_output_tokens`, `top_p`, `stop` 等参数
-*   **反指纹检测**: 使用 Camoufox 降低被检测为自动化脚本的风险
-*   **多种响应获取方式**: 集成流式代理、外部 Helper 服务、Playwright 页面交互
-*   **Web UI**: 内置现代化的测试界面，支持聊天、状态监控、安全的API密钥管理
-*   **图形界面启动器**: 提供 GUI 启动器，简化配置和管理
-*   **灵活的认证系统**: 支持可选的API密钥认证，兼容OpenAI标准的Bearer token
+*   **OpenAI 兼容 API**: 支持 `/v1/chat/completions` 端点，完全兼容 OpenAI 客户端
+*   **流式和非流式响应**: 支持实时流式输出和传统的完整响应模式
+*   **智能模型切换**: 通过 API 请求中的 `model` 字段动态切换 AI Studio 中的模型
+*   **完整参数控制**: 支持 `temperature`、`max_output_tokens`、`top_p`、`stop` 等所有主要参数
+*   **反指纹检测**: 使用 Camoufox 浏览器降低被检测为自动化脚本的风险
+*   **多层响应获取**: 集成流式代理、外部 Helper 服务、Playwright 页面交互的多重保障机制
+*   **脚本注入功能**: 支持油猴脚本动态挂载，实现与前端显示效果100%一致的模型增强 🆕
+*   **现代化 Web UI**: 内置测试界面，支持实时聊天、状态监控、API密钥管理
+*   **图形界面启动器**: 提供功能丰富的 GUI 启动器，简化配置和进程管理
+*   **灵活认证系统**: 支持可选的API密钥认证，完全兼容OpenAI标准的Bearer token格式
+*   **模块化架构**: 采用清晰的模块化设计，便于维护和扩展
+*   **统一配置管理**: 基于 `.env` 文件的统一配置方式，支持环境变量覆盖
 
 ## 系统架构
 
@@ -56,23 +59,28 @@ graph TD
     end
 
     subgraph "启动与配置 (Launch & Config)"
-        GUI_Launch["gui_launcher.py"]
-        CLI_Launch["launch_camoufox.py"]
+        GUI_Launch["gui_launcher.py (图形启动器)"]
+        CLI_Launch["launch_camoufox.py (命令行启动)"]
+        EnvConfig[".env (统一配置)"]
         KeyFile["key.txt (API Keys)"]
-        ConfigDir["config/ (Settings)"]
+        ConfigDir["config/ (配置模块)"]
     end
 
     subgraph "核心应用 (Core Application)"
-        FastAPI_App["api_utils/app.py (FastAPI App)"]
-        Routes["api_utils/routes.py"]
-        RequestProcessor["api_utils/request_processor.py"]
-        PageController["browser_utils/page_controller.py"]
-        StreamProxy["stream/ (Proxy Server)"]
+        FastAPI_App["api_utils/app.py (FastAPI 应用)"]
+        Routes["api_utils/routes.py (路由处理)"]
+        RequestProcessor["api_utils/request_processor.py (请求处理)"]
+        AuthUtils["api_utils/auth_utils.py (认证管理)"]
+        PageController["browser_utils/page_controller.py (页面控制)"]
+        ScriptManager["browser_utils/script_manager.py (脚本注入)"]
+        ModelManager["browser_utils/model_management.py (模型管理)"]
+        StreamProxy["stream/ (流式代理服务器)"]
     end
 
     subgraph "外部依赖 (External Dependencies)"
-        CamoufoxInstance["Camoufox 浏览器 (Browser)"]
+        CamoufoxInstance["Camoufox 浏览器 (反指纹)"]
         AI_Studio["Google AI Studio"]
+        UserScript["油猴脚本 (可选)"]
     end
 
     User -- "运行 (Run)" --> GUI_Launch
@@ -86,14 +94,20 @@ graph TD
     API_Client -- "API 请求 (Request)" --> FastAPI_App
     WebUI -- "聊天请求 (Chat Request)" --> FastAPI_App
 
-    FastAPI_App -- "读取配置 (Reads Config)" --> ConfigDir
+    FastAPI_App -- "读取配置 (Reads Config)" --> EnvConfig
     FastAPI_App -- "使用路由 (Uses Routes)" --> Routes
-    FastAPI_App -- "验证密钥 (Validates Key)" --> KeyFile
+    AuthUtils -- "验证密钥 (Validates Key)" --> KeyFile
+    ConfigDir -- "提供设置 (Provides Settings)" --> EnvConfig
 
     Routes -- "处理请求 (Processes Request)" --> RequestProcessor
+    Routes -- "认证管理 (Auth Management)" --> AuthUtils
     RequestProcessor -- "控制浏览器 (Controls Browser)" --> PageController
     RequestProcessor -- "通过代理 (Uses Proxy)" --> StreamProxy
 
+    PageController -- "模型管理 (Model Management)" --> ModelManager
+    PageController -- "脚本注入 (Script Injection)" --> ScriptManager
+    ScriptManager -- "加载脚本 (Loads Script)" --> UserScript
+    ScriptManager -- "增强功能 (Enhances)" --> CamoufoxInstance
     PageController -- "自动化 (Automates)" --> CamoufoxInstance
     CamoufoxInstance -- "访问 (Accesses)" --> AI_Studio
     StreamProxy -- "转发请求 (Forwards Request)" --> AI_Studio
@@ -161,6 +175,7 @@ python launch_camoufox.py --headless
 - [Web UI使用指南](docs/webui-guide.md) - Web界面功能说明
 - [故障排除指南](docs/troubleshooting.md) - 常见问题解决方案
 - [高级配置指南](docs/advanced-configuration.md) - 高级功能和配置选项
+- [脚本注入指南](docs/script_injection_guide.md) - 油猴脚本动态挂载功能使用指南 (v3.0) 🆕
 - [日志控制指南](docs/logging-control.md) - 日志系统配置和调试
 - [依赖版本说明](docs/dependency-versions.md) - Python版本要求和依赖兼容性详解
 
@@ -188,15 +203,15 @@ python launch_camoufox.py --headless
 
 ```bash
 # 1. 准备配置文件
-cp docker/.env.docker .env
+cd docker
+cp .env.docker .env
 nano .env  # 编辑配置
 
 # 2. 使用 Docker Compose 启动
-cd docker
-docker-compose up -d
+docker compose up -d
 
-# 3. 版本更新
-cd .. && git pull && cd docker && docker-compose up -d --build
+# 3. 版本更新 (在 docker 目录下)
+bash update.sh
 ```
 
 ### 详细文档
@@ -206,8 +221,8 @@ cd .. && git pull && cd docker && docker-compose up -d --build
 
 ### 重要说明
 
-- ✅ **配置统一**: Docker 和本地环境使用相同的 `.env` 配置方式
-- ✅ **版本更新**: `git pull` + `docker-compose up -d --build` 即可完成更新
+- ✅ **配置统一**: 使用 `.env` 文件管理所有配置
+- ✅ **版本更新**: `bash update.sh` 即可完成更新
 - ✅ **目录整洁**: Docker 文件已移至 `docker/` 目录
 - ⚠️ **认证文件**: 首次运行需要在主机上获取认证文件，然后挂载到容器中
 

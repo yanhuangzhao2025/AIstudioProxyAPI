@@ -1,6 +1,37 @@
 # 故障排除指南
 
-本文档提供常见问题的解决方案和调试方法。
+本文档提供 AI Studio Proxy API 项目常见问题的解决方案和调试方法，涵盖安装、配置、运行、API使用等各个方面。
+
+## 快速诊断
+
+在深入具体问题之前，可以先进行快速诊断：
+
+### 1. 检查服务状态
+```bash
+# 检查服务是否正常运行
+curl http://127.0.0.1:2048/health
+
+# 检查API信息
+curl http://127.0.0.1:2048/api/info
+```
+
+### 2. 检查配置文件
+```bash
+# 检查 .env 文件是否存在
+ls -la .env
+
+# 检查关键配置项
+grep -E "(PORT|SCRIPT_INJECTION|LOG_LEVEL)" .env
+```
+
+### 3. 查看日志
+```bash
+# 查看最新日志
+tail -f logs/app.log
+
+# 查看错误日志
+grep -i error logs/app.log
+```
 
 ## 安装相关问题
 
@@ -258,6 +289,165 @@ chmod 644 key.txt
 *   **无法发送空消息**: 这是正常的安全机制
 *   **对话请求失败**: 检查网络连接，确认服务器正常运行
 
+## 脚本注入问题 🆕
+
+### 脚本注入功能未启用
+
+**检查配置**:
+```bash
+# 检查 .env 文件中的配置
+grep SCRIPT_INJECTION .env
+grep USERSCRIPT_PATH .env
+```
+
+**常见问题**:
+- `ENABLE_SCRIPT_INJECTION=false` - 功能被禁用
+- 脚本文件路径不正确
+- 脚本文件不存在或无法读取
+
+**解决方案**:
+```bash
+# 启用脚本注入
+echo "ENABLE_SCRIPT_INJECTION=true" >> .env
+
+# 检查脚本文件是否存在
+ls -la browser_utils/more_modles.js
+
+# 检查文件权限
+chmod 644 browser_utils/more_modles.js
+```
+
+### 模型未显示在列表中
+
+**前端检查**:
+1. 打开浏览器开发者工具 (F12)
+2. 查看控制台是否有 JavaScript 错误
+3. 检查网络选项卡中的模型列表请求
+
+**后端检查**:
+```bash
+# 查看脚本注入相关日志
+python launch_camoufox.py --debug | grep -i "script\|inject\|model"
+
+# 检查 API 响应
+curl http://localhost:2048/v1/models | jq '.data[] | select(.injected == true)'
+```
+
+**常见原因**:
+- 脚本格式错误，无法解析 `MODELS_TO_INJECT` 数组
+- 网络拦截失败，脚本注入未生效
+- 模型名称格式不正确
+
+### 脚本解析失败
+
+**检查脚本格式**:
+```javascript
+// 确保脚本包含正确的模型数组格式
+const MODELS_TO_INJECT = [
+    {
+        name: 'models/your-model-name',
+        displayName: 'Your Model Display Name',
+        description: 'Model description'
+    }
+];
+```
+
+**调试步骤**:
+1. 验证脚本文件的 JavaScript 语法
+2. 检查模型数组的格式是否正确
+3. 确认模型名称以 `models/` 开头
+
+### 网络拦截失败
+
+**检查 Playwright 状态**:
+- 确认浏览器上下文正常创建
+- 检查网络路由是否正确设置
+- 验证请求 URL 匹配规则
+
+**调试方法**:
+```bash
+# 启用详细日志查看网络拦截状态
+export DEBUG_LOGS_ENABLED=true
+python launch_camoufox.py --debug
+```
+
+**常见错误**:
+- 浏览器上下文创建失败
+- 网络路由设置异常
+- 请求 URL 不匹配拦截规则
+
+### 模型解析问题
+
+**脚本格式错误**:
+```bash
+# 检查脚本文件语法
+node -c browser_utils/more_modles.js
+```
+
+**文件权限问题**:
+```bash
+# 检查文件权限
+ls -la browser_utils/more_modles.js
+
+# 修复权限
+chmod 644 browser_utils/more_modles.js
+```
+
+**脚本文件不存在**:
+- 系统会静默跳过不存在的脚本文件
+- 检查 `USERSCRIPT_PATH` 环境变量设置
+- 确保脚本文件包含有效的 `MODELS_TO_INJECT` 数组
+
+### 性能问题
+
+**脚本注入延迟**:
+- 网络拦截可能增加轻微延迟
+- 大量模型注入可能影响页面加载
+- 建议限制注入模型数量（< 20个）
+
+**内存使用**:
+- 脚本内容会被缓存在内存中
+- 大型脚本文件可能增加内存使用
+- 定期重启服务释放内存
+
+### 调试技巧
+
+**启用详细日志**:
+```bash
+# 在 .env 文件中添加
+DEBUG_LOGS_ENABLED=true
+TRACE_LOGS_ENABLED=true
+SERVER_LOG_LEVEL=DEBUG
+```
+
+**检查注入状态**:
+```bash
+# 查看脚本注入相关的日志输出
+tail -f logs/app.log | grep -i "script\|inject"
+```
+
+**验证模型注入**:
+```bash
+# 检查 API 返回的模型列表
+curl -s http://localhost:2048/v1/models | jq '.data[] | select(.injected == true) | {id, display_name}'
+```
+
+### 禁用脚本注入
+
+如果遇到严重问题，可以临时禁用脚本注入：
+
+```bash
+# 方法1：修改 .env 文件
+echo "ENABLE_SCRIPT_INJECTION=false" >> .env
+
+# 方法2：使用环境变量
+export ENABLE_SCRIPT_INJECTION=false
+python launch_camoufox.py --headless
+
+# 方法3：删除脚本文件（临时）
+mv browser_utils/more_modles.js browser_utils/more_modles.js.bak
+```
+
 ## 日志和调试
 
 ### 查看详细日志
@@ -309,5 +499,6 @@ export TRACE_LOGS_ENABLED=true
 ## 下一步
 
 故障排除完成后，请参考：
+- [脚本注入指南](script_injection_guide.md) - 脚本注入功能详细说明
 - [日志控制指南](logging-control.md)
 - [高级配置指南](advanced-configuration.md)

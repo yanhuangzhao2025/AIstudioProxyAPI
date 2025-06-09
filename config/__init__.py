@@ -80,7 +80,9 @@ __all__ = [
     'LOG_DIR',
     'APP_LOG_FILE_PATH',
     'NO_PROXY_ENV',
-    
+    'ENABLE_SCRIPT_INJECTION',
+    'USERSCRIPT_PATH',
+
     # 工具函数
     'get_environment_variable',
     'get_boolean_env',

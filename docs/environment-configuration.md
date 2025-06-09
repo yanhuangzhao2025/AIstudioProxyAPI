@@ -1,15 +1,20 @@
 # 环境变量配置指南
 
-本文档介绍如何使用 `.env` 文件来配置 AI Studio Proxy API 项目，避免硬编码配置参数。
+本文档详细介绍如何使用 `.env` 文件来配置 AI Studio Proxy API 项目，实现统一的配置管理。
 
 ## 概述
 
-项目现在支持通过 `.env` 文件进行配置管理，这样可以：
+项目采用基于 `.env` 文件的现代化配置管理系统，提供以下优势：
 
-- 避免每次更新版本时重新修改配置参数
-- 保护敏感配置信息（`.env` 文件已被 `.gitignore` 忽略）
-- 方便不同环境的配置管理
-- 一个 `git pull` 就能完成版本更新
+### 主要优势
+
+- ✅ **版本更新无忧**: 一个 `git pull` 就完成更新，无需重新配置
+- ✅ **配置集中管理**: 所有配置项统一在 `.env` 文件中，清晰明了
+- ✅ **启动命令简化**: 无需复杂的命令行参数，一键启动
+- ✅ **安全性**: `.env` 文件已被 `.gitignore` 忽略，不会泄露敏感配置
+- ✅ **灵活性**: 支持不同环境的配置管理（开发、测试、生产）
+- ✅ **Docker 兼容**: Docker 和本地环境使用相同的配置方式
+- ✅ **模块化设计**: 配置项按功能分组，便于理解和维护
 
 ## 快速开始
 
@@ -163,6 +168,25 @@ GUI_DEFAULT_STREAM_PORT=3120
 GUI_DEFAULT_HELPER_ENDPOINT=
 ```
 
+### 脚本注入配置 🆕
+
+```env
+# 是否启用油猴脚本注入功能
+ENABLE_SCRIPT_INJECTION=true
+
+# 油猴脚本文件路径（相对于项目根目录）
+# 模型数据直接从此脚本文件中解析，无需额外配置文件
+USERSCRIPT_PATH=browser_utils/more_modles.js
+```
+
+**脚本注入功能说明**：
+- 支持动态挂载油猴脚本来增强 AI Studio 的模型列表
+- 使用 Playwright 原生网络拦截，确保 100% 可靠性
+- 直接从油猴脚本解析模型数据，与前端显示效果100%一致
+- 脚本文件不存在时会静默跳过，不影响主要功能
+
+详细使用方法请参见 [脚本注入指南](script_injection_guide.md)。
+
 ## 配置优先级
 
 配置项的优先级顺序（从高到低）：
@@ -214,6 +238,19 @@ SILENCE_TIMEOUT_MS=120000
 DEFAULT_FASTAPI_PORT=3048
 DEFAULT_CAMOUFOX_PORT=9223
 STREAM_PORT=3121
+```
+
+### 场景 5：启用脚本注入 🆕
+
+```env
+# 启用脚本注入功能
+ENABLE_SCRIPT_INJECTION=true
+
+# 使用自定义脚本（模型数据直接从脚本解析）
+USERSCRIPT_PATH=browser_utils/my_custom_script.js
+
+# 调试模式查看注入效果
+DEBUG_LOGS_ENABLED=true
 ```
 
 ## 配置优先级

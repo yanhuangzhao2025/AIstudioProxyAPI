@@ -41,6 +41,7 @@ RUN mkdir -p /app/logs && \
     mkdir -p /app/auth_profiles/active && \
     mkdir -p /app/auth_profiles/saved && \
     mkdir -p /app/certs && \
+    mkdir -p /app/browser_utils/custom_scripts && \
     mkdir -p /home/appuser/.cache/ms-playwright && \
     mkdir -p /home/appuser/.mozilla && \
     chown -R appuser:appgroup /app && \

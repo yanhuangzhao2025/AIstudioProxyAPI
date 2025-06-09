@@ -100,16 +100,26 @@ async def queue_worker():
             request_data = request_item["request_data"]
             http_request = request_item["http_request"]
             result_future = request_item["result_future"]
-            
+
             if request_item.get("cancelled", False):
                 logger.info(f"[{req_id}] (Worker) 请求已取消，跳过。")
                 if not result_future.done():
                     result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 请求已被用户取消"))
                 request_queue.task_done()
                 continue
-            
+
             is_streaming_request = request_data.stream
             logger.info(f"[{req_id}] (Worker) 取出请求。模式: {'流式' if is_streaming_request else '非流式'}")
+
+            # 优化：在开始处理前主动检测客户端连接状态，避免不必要的处理
+            from api_utils.request_processor import _test_client_connection
+            is_connected = await _test_client_connection(req_id, http_request)
+            if not is_connected:
+                logger.info(f"[{req_id}] (Worker) ✅ 主动检测到客户端已断开，跳过处理节省资源")
+                if not result_future.done():
+                    result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端在处理前已断开连接"))
+                request_queue.task_done()
+                continue
             
             # 流式请求间隔控制
             current_time = time.time()
@@ -118,8 +128,10 @@ async def queue_worker():
                 logger.info(f"[{req_id}] (Worker) 连续流式请求，添加 {delay_time:.2f}s 延迟...")
                 await asyncio.sleep(delay_time)
             
-            if await http_request.is_disconnected():
-                logger.info(f"[{req_id}] (Worker) 客户端在等待锁时断开。取消。")
+            # 等待锁前再次主动检测客户端连接
+            is_connected = await _test_client_connection(req_id, http_request)
+            if not is_connected:
+                logger.info(f"[{req_id}] (Worker) ✅ 等待锁时检测到客户端断开，取消处理")
                 if not result_future.done():
                     result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端关闭了请求"))
                 request_queue.task_done()
@@ -129,8 +141,10 @@ async def queue_worker():
             async with processing_lock:
                 logger.info(f"[{req_id}] (Worker) 已获取处理锁。开始核心处理...")
                 
-                if await http_request.is_disconnected():
-                    logger.info(f"[{req_id}] (Worker) 客户端在获取锁后断开。取消。")
+                # 获取锁后最终主动检测客户端连接
+                is_connected = await _test_client_connection(req_id, http_request)
+                if not is_connected:
+                    logger.info(f"[{req_id}] (Worker) ✅ 获取锁后检测到客户端断开，取消处理")
                     if not result_future.done():
                         result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端关闭了请求"))
                 elif result_future.done():
@@ -161,16 +175,79 @@ async def queue_worker():
                             current_request_was_streaming = False
                             logger.warning(f"[{req_id}] (Worker) _process_request_refactored returned unexpected type: {type(returned_value)}")
 
-                        # 关键修复：在锁内等待流式完成（与原始参考文件一致）
+                        # 统一的客户端断开检测和响应处理
                         if completion_event:
+                            # 流式模式：等待流式生成器完成信号
                             logger.info(f"[{req_id}] (Worker) 等待流式生成器完成信号...")
-                            try:
+
+                            # 创建一个增强的客户端断开检测器，支持提前done信号触发
+                            client_disconnected_early = False
+
+                            async def enhanced_disconnect_monitor():
+                                nonlocal client_disconnected_early
+                                while not completion_event.is_set():
+                                    try:
+                                        # 主动检查客户端是否断开连接
+                                        is_connected = await _test_client_connection(req_id, http_request)
+                                        if not is_connected:
+                                            logger.info(f"[{req_id}] (Worker) ✅ 流式处理中检测到客户端断开，提前触发done信号")
+                                            client_disconnected_early = True
+                                            # 立即设置completion_event以提前结束等待
+                                            if not completion_event.is_set():
+                                                completion_event.set()
+                                            break
+                                        await asyncio.sleep(0.3)  # 更频繁的检查间隔
+                                    except Exception as e:
+                                        logger.error(f"[{req_id}] (Worker) 增强断开检测器错误: {e}")
+                                        break
+
+                            # 启动增强的断开连接监控
+                            disconnect_monitor_task = asyncio.create_task(enhanced_disconnect_monitor())
+                        else:
+                            # 非流式模式：等待处理完成并检测客户端断开
+                            logger.info(f"[{req_id}] (Worker) 非流式模式，等待处理完成...")
+
+                            client_disconnected_early = False
+
+                            async def non_streaming_disconnect_monitor():
+                                nonlocal client_disconnected_early
+                                while not result_future.done():
+                                    try:
+                                        # 主动检查客户端是否断开连接
+                                        is_connected = await _test_client_connection(req_id, http_request)
+                                        if not is_connected:
+                                            logger.info(f"[{req_id}] (Worker) ✅ 非流式处理中检测到客户端断开，取消处理")
+                                            client_disconnected_early = True
+                                            # 取消result_future
+                                            if not result_future.done():
+                                                result_future.set_exception(HTTPException(status_code=499, detail=f"[{req_id}] 客户端在非流式处理中断开连接"))
+                                            break
+                                        await asyncio.sleep(0.3)  # 更频繁的检查间隔
+                                    except Exception as e:
+                                        logger.error(f"[{req_id}] (Worker) 非流式断开检测器错误: {e}")
+                                        break
+
+                            # 启动非流式断开连接监控
+                            disconnect_monitor_task = asyncio.create_task(non_streaming_disconnect_monitor())
+
+                        # 等待处理完成（流式或非流式）
+                        try:
+                            if completion_event:
+                                # 流式模式：等待completion_event
                                 from server import RESPONSE_COMPLETION_TIMEOUT
                                 await asyncio.wait_for(completion_event.wait(), timeout=RESPONSE_COMPLETION_TIMEOUT/1000 + 60)
-                                logger.info(f"[{req_id}] (Worker) ✅ 流式生成器完成信号收到。")
+                                logger.info(f"[{req_id}] (Worker) ✅ 流式生成器完成信号收到。客户端提前断开: {client_disconnected_early}")
+                            else:
+                                # 非流式模式：等待result_future完成
+                                from server import RESPONSE_COMPLETION_TIMEOUT
+                                await asyncio.wait_for(asyncio.shield(result_future), timeout=RESPONSE_COMPLETION_TIMEOUT/1000 + 60)
+                                logger.info(f"[{req_id}] (Worker) ✅ 非流式处理完成。客户端提前断开: {client_disconnected_early}")
 
-                                # 等待发送按钮禁用确认流式响应完全结束
-                                if submit_btn_loc and client_disco_checker:
+                            # 如果客户端提前断开，跳过按钮状态处理
+                            if client_disconnected_early:
+                                logger.info(f"[{req_id}] (Worker) 客户端提前断开，跳过按钮状态处理")
+                            elif submit_btn_loc and client_disco_checker and completion_event:
+                                    # 等待发送按钮禁用确认流式响应完全结束
                                     logger.info(f"[{req_id}] (Worker) 流式响应完成，检查并处理发送按钮状态...")
                                     wait_timeout_ms = 30000  # 30 seconds
                                     try:
@@ -208,17 +285,25 @@ async def queue_worker():
                                         await save_error_snapshot(f"stream_post_submit_button_handling_timeout_{req_id}")
                                     except ClientDisconnectedError:
                                         logger.info(f"[{req_id}] 客户端在流式响应后按钮状态处理时断开连接。")
-                                elif current_request_was_streaming:
-                                    logger.warning(f"[{req_id}] (Worker) 流式请求但 submit_btn_loc 或 client_disco_checker 未提供。跳过按钮禁用等待。")
+                            elif completion_event and current_request_was_streaming:
+                                logger.warning(f"[{req_id}] (Worker) 流式请求但 submit_btn_loc 或 client_disco_checker 未提供。跳过按钮禁用等待。")
 
-                            except asyncio.TimeoutError:
-                                logger.warning(f"[{req_id}] (Worker) ⚠️ 等待流式生成器完成信号超时。")
-                                if not result_future.done():
-                                    result_future.set_exception(HTTPException(status_code=504, detail=f"[{req_id}] Stream generation timed out waiting for completion signal."))
-                            except Exception as ev_wait_err:
-                                logger.error(f"[{req_id}] (Worker) ❌ 等待流式完成事件时出错: {ev_wait_err}")
-                                if not result_future.done():
-                                    result_future.set_exception(HTTPException(status_code=500, detail=f"[{req_id}] Error waiting for stream completion: {ev_wait_err}"))
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[{req_id}] (Worker) ⚠️ 等待处理完成超时。")
+                            if not result_future.done():
+                                result_future.set_exception(HTTPException(status_code=504, detail=f"[{req_id}] Processing timed out waiting for completion."))
+                        except Exception as ev_wait_err:
+                            logger.error(f"[{req_id}] (Worker) ❌ 等待处理完成时出错: {ev_wait_err}")
+                            if not result_future.done():
+                                result_future.set_exception(HTTPException(status_code=500, detail=f"[{req_id}] Error waiting for completion: {ev_wait_err}"))
+                        finally:
+                            # 清理断开连接监控任务
+                            if 'disconnect_monitor_task' in locals() and not disconnect_monitor_task.done():
+                                disconnect_monitor_task.cancel()
+                                try:
+                                    await disconnect_monitor_task
+                                except asyncio.CancelledError:
+                                    pass
 
                     except Exception as process_err:
                         logger.error(f"[{req_id}] (Worker) _process_request_refactored execution error: {process_err}")

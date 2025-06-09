@@ -71,10 +71,13 @@ pip install -r requirements.txt
 - **FastAPI**: 使用 0.115.12 版本，最新稳定版本，支持 Python 3.8+
   - 包含新的参数模型功能和性能优化
   - 改进的类型提示和 OpenAPI 文档生成
-- **Pydantic**: 使用 2.7.1+ 版本范围，提供强大的数据验证
-- **Uvicorn**: 使用 0.29.0 版本，高性能 ASGI 服务器
-- **Playwright**: 最新版本，用于浏览器自动化
-- **Camoufox**: 反指纹检测浏览器，包含 geoip 数据
+  - 完全兼容 OpenAI API 标准
+- **Pydantic**: 使用 2.7.1+ 版本范围，提供强大的数据验证和类型安全
+- **Uvicorn**: 使用 0.29.0 版本，高性能 ASGI 服务器，支持异步处理
+- **Playwright**: 最新版本，用于浏览器自动化和页面交互
+- **Camoufox**: 反指纹检测浏览器，包含 geoip 数据，提供更好的隐蔽性
+- **WebSockets**: 12.0 版本，用于实时日志传输和状态监控
+- **aiohttp**: 3.9.5 版本，用于异步HTTP客户端操作
 
 ### 4. 下载 Camoufox 浏览器
 

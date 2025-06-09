@@ -25,10 +25,6 @@ SAVED_AUTH_DIR = os.path.join(AUTH_PROFILES_DIR, 'saved')
 LOG_DIR = os.path.join(os.path.dirname(__file__), '..', 'logs')
 APP_LOG_FILE_PATH = os.path.join(LOG_DIR, 'app.log')
 
-# --- 代理配置 ---
-# 注意：代理配置现在在 api_utils/app.py 中动态设置，根据 STREAM_PORT 环境变量决定
-NO_PROXY_ENV = os.environ.get('NO_PROXY')
-
 def get_environment_variable(key: str, default: str = '') -> str:
     """获取环境变量值"""
     return os.environ.get(key, default)
@@ -46,4 +42,13 @@ def get_int_env(key: str, default: int = 0) -> int:
     try:
         return int(os.environ.get(key, str(default)))
     except (ValueError, TypeError):
-        return default 
+        return default
+
+# --- 代理配置 ---
+# 注意：代理配置现在在 api_utils/app.py 中动态设置，根据 STREAM_PORT 环境变量决定
+NO_PROXY_ENV = os.environ.get('NO_PROXY')
+
+# --- 脚本注入配置 ---
+ENABLE_SCRIPT_INJECTION = get_boolean_env('ENABLE_SCRIPT_INJECTION', True)
+USERSCRIPT_PATH = get_environment_variable('USERSCRIPT_PATH', 'browser_utils/more_modles.js')
+# 注意：MODEL_CONFIG_PATH 已废弃，现在直接从油猴脚本解析模型数据

@@ -11,7 +11,7 @@ uvloop ; sys_platform != "win32" # For Uvicorn performance on Linux/macOS
 
 # Core launch_camoufox dependencies
 playwright
-camoufox[geoip]
+camoufox[geoip]==0.4.11
 
 # Security and Cryptography
 cryptography==42.0.5

@@ -46,7 +46,10 @@ PYTHON_EXECUTABLE = sys.executable
 ENDPOINT_CAPTURE_TIMEOUT = int(os.environ.get('ENDPOINT_CAPTURE_TIMEOUT', '45'))  # 秒 (from dev)
 DEFAULT_SERVER_PORT = int(os.environ.get('DEFAULT_FASTAPI_PORT', '2048'))  # FastAPI 服务器端口
 DEFAULT_CAMOUFOX_PORT = int(os.environ.get('DEFAULT_CAMOUFOX_PORT', '9222'))  # Camoufox 调试端口 (如果内部启动需要)
+DEFAULT_STREAM_PORT = int(os.environ.get('STREAM_PORT', '3120'))  # 流式代理服务器端口
 DEFAULT_HELPER_ENDPOINT = os.environ.get('GUI_DEFAULT_HELPER_ENDPOINT', '')  # 外部 Helper 端点
+DEFAULT_AUTH_SAVE_TIMEOUT = int(os.environ.get('AUTH_SAVE_TIMEOUT', '30'))  # 认证保存超时时间
+DEFAULT_SERVER_LOG_LEVEL = os.environ.get('SERVER_LOG_LEVEL', 'INFO')  # 服务器日志级别
 AUTH_PROFILES_DIR = os.path.join(os.path.dirname(__file__), "auth_profiles")
 ACTIVE_AUTH_DIR = os.path.join(AUTH_PROFILES_DIR, "active")
 SAVED_AUTH_DIR = os.path.join(AUTH_PROFILES_DIR, "saved")
@@ -507,10 +510,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--stream-port",
         type=int,
-        default=3120, # 使用默认值
+        default=DEFAULT_STREAM_PORT, # 从 .env 文件读取默认值
         help=(
             f"流式代理服务器使用端口"
-            f"提供来禁用此功能 --stream-port=0 . 默认: 3120"
+            f"提供来禁用此功能 --stream-port=0 . 默认: {DEFAULT_STREAM_PORT}"
         )
     )
     parser.add_argument(
@@ -544,13 +547,13 @@ if __name__ == "__main__":
         help="[调试模式] 在登录成功后，如果之前未加载认证文件，则自动提示并保存新的认证状态。"
     )
     parser.add_argument( # from dev
-        "--auth-save-timeout", type=int, default=30,
-        help="[调试模式] 自动保存认证或输入认证文件名的等待超时时间 (秒)。"
+        "--auth-save-timeout", type=int, default=DEFAULT_AUTH_SAVE_TIMEOUT,
+        help=f"[调试模式] 自动保存认证或输入认证文件名的等待超时时间 (秒)。默认: {DEFAULT_AUTH_SAVE_TIMEOUT}"
     )
     # 日志相关参数 (from dev)
     parser.add_argument(
-        "--server-log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        help="server.py 的日志级别。"
+        "--server-log-level", type=str, default=DEFAULT_SERVER_LOG_LEVEL, choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help=f"server.py 的日志级别。默认: {DEFAULT_SERVER_LOG_LEVEL}"
     )
     parser.add_argument(
         "--server-redirect-print", action='store_true',
@@ -662,22 +665,45 @@ if __name__ == "__main__":
         final_launch_mode = 'virtual_headless'
         if platform.system() != "Linux":
             logger.warning("⚠️ --virtual-display 模式主要为 Linux 设计。在非 Linux 系统上，其行为可能与标准无头模式相同或导致 Camoufox 内部错误。")
-    else: 
+    else:
+        # 读取 .env 文件中的 LAUNCH_MODE 配置作为默认值
+        env_launch_mode = os.environ.get('LAUNCH_MODE', '').lower()
+        default_mode_from_env = None
+        default_interactive_choice = '1'  # 默认选择无头模式
+
+        # 将 .env 中的 LAUNCH_MODE 映射到交互式选择
+        if env_launch_mode == 'headless':
+            default_mode_from_env = 'headless'
+            default_interactive_choice = '1'
+        elif env_launch_mode == 'debug' or env_launch_mode == 'normal':
+            default_mode_from_env = 'debug'
+            default_interactive_choice = '2'
+        elif env_launch_mode == 'virtual_display' or env_launch_mode == 'virtual_headless':
+            default_mode_from_env = 'virtual_headless'
+            default_interactive_choice = '3' if platform.system() == "Linux" else '1'
+
         logger.info("--- 请选择启动模式 (未通过命令行参数指定) ---")
+        if env_launch_mode and default_mode_from_env:
+            logger.info(f"  从 .env 文件读取到默认启动模式: {env_launch_mode} -> {default_mode_from_env}")
+
         prompt_options_text = "[1] 无头模式, [2] 调试模式"
         valid_choices = {'1': 'headless', '2': 'debug'}
-        default_interactive_choice = '1'
+
         if platform.system() == "Linux": # from dev
             prompt_options_text += ", [3] 无头模式 (虚拟显示 Xvfb)"
             valid_choices['3'] = 'virtual_headless'
+
+        # 构建提示信息，显示当前默认选择
+        default_mode_name = valid_choices.get(default_interactive_choice, 'headless')
         user_mode_choice = input_with_timeout(
-            f"  请输入启动模式 ({prompt_options_text}; 默认: {default_interactive_choice} 无头模式，{15}秒超时): ", 15
+            f"  请输入启动模式 ({prompt_options_text}; 默认: {default_interactive_choice} {default_mode_name}模式，{15}秒超时): ", 15
         ) or default_interactive_choice
+
         if user_mode_choice in valid_choices:
             final_launch_mode = valid_choices[user_mode_choice]
         else:
-            final_launch_mode = 'headless' # Default to headless
-            logger.info(f"无效输入 '{user_mode_choice}' 或超时，默认启动模式: 无头模式")
+            final_launch_mode = default_mode_from_env or 'headless' # 使用 .env 默认值或回退到无头模式
+            logger.info(f"无效输入 '{user_mode_choice}' 或超时，使用默认启动模式: {final_launch_mode}模式")
     logger.info(f"最终选择的启动模式: {final_launch_mode.replace('_', ' ')}模式")
     logger.info("-------------------------------------------------")
 
@@ -763,77 +789,79 @@ if __name__ == "__main__":
             sys.exit(1)
     else:
         # --active-auth-json 未提供。
-        logger.info(f"  --active-auth-json 未提供。检查 '{ACTIVE_AUTH_DIR}' 中的默认认证文件...")
-        try:
-            if os.path.exists(ACTIVE_AUTH_DIR):
-                active_json_files = sorted([
-                    f for f in os.listdir(ACTIVE_AUTH_DIR)
-                    if f.lower().endswith('.json') and os.path.isfile(os.path.join(ACTIVE_AUTH_DIR, f))
-                ])
-                if active_json_files:
-                    effective_active_auth_json_path = os.path.join(ACTIVE_AUTH_DIR, active_json_files[0])
-                    logger.info(f"  将使用 '{ACTIVE_AUTH_DIR}' 中按名称排序的第一个JSON文件: {os.path.basename(effective_active_auth_json_path)}")
-                else:
-                    logger.info(f"  目录 '{ACTIVE_AUTH_DIR}' 为空或不包含JSON文件。")
-            else:
-                logger.info(f"  目录 '{ACTIVE_AUTH_DIR}' 不存在。")
-        except Exception as e_scan_active:
-            logger.warning(f"  扫描 '{ACTIVE_AUTH_DIR}' 时发生错误: {e_scan_active}", exc_info=True)
-
-        if not effective_active_auth_json_path:
-            # 如果在 active/ 中未找到默认认证文件，则回退到特定于模式的现有逻辑
-            logger.info(f"  未从 '{ACTIVE_AUTH_DIR}' 加载默认认证文件。遵循特定于模式的现有逻辑。")
-            if final_launch_mode == 'headless' or final_launch_mode == 'virtual_headless':
-                # 对于无头模式，如果 --active-auth-json 未提供且 active/ 为空，则报错
-                logger.error(f"  ❌ {final_launch_mode} 模式错误: --active-auth-json 未提供，且活动认证目录 '{ACTIVE_AUTH_DIR}' 中未找到任何 '.json' 认证文件。请先在调试模式下保存一个或通过参数指定。")
-                sys.exit(1)
-            elif final_launch_mode == 'debug':
-                # 对于调试模式，如果 --active-auth-json 未提供且 active/ 为空，则提示用户选择
-                logger.info(f"  调试模式: 提示用户从可用认证文件中选择...")
-                available_profiles = []
-                # 首先扫描 ACTIVE_AUTH_DIR，然后是 SAVED_AUTH_DIR
-                for profile_dir_path_str, dir_label in [(ACTIVE_AUTH_DIR, "active"), (SAVED_AUTH_DIR, "saved")]:
-                    if os.path.exists(profile_dir_path_str):
-                        try:
-                            # 在每个目录中对文件名进行排序
-                            filenames = sorted([
-                                f for f in os.listdir(profile_dir_path_str)
-                                if f.lower().endswith(".json") and os.path.isfile(os.path.join(profile_dir_path_str, f))
-                            ])
-                            for filename in filenames:
-                                full_path = os.path.join(profile_dir_path_str, filename)
-                                available_profiles.append({"name": f"{dir_label}/{filename}", "path": full_path})
-                        except OSError as e:
-                            logger.warning(f"   ⚠️ 警告: 无法读取目录 '{profile_dir_path_str}': {e}")
-                
-                if available_profiles:
-                    # 对可用配置文件列表进行排序，以确保一致的显示顺序
-                    available_profiles.sort(key=lambda x: x['name'])
-                    print('-'*60 + "\n   找到以下可用的认证文件:", flush=True)
-                    for i, profile in enumerate(available_profiles): print(f"     {i+1}: {profile['name']}", flush=True)
-                    print("     N: 不加载任何文件 (使用浏览器当前状态)\n" + '-'*60, flush=True)
-                    choice = input_with_timeout(f"   请选择要加载的认证文件编号 (输入 N 或直接回车则不加载, {args.auth_save_timeout}s超时): ", args.auth_save_timeout)
-                    if choice.strip().lower() not in ['n', '']:
-                        try:
-                            choice_index = int(choice.strip()) - 1
-                            if 0 <= choice_index < len(available_profiles):
-                                selected_profile = available_profiles[choice_index]
-                                effective_active_auth_json_path = selected_profile["path"]
-                                logger.info(f"   已选择加载认证文件: {selected_profile['name']}")
-                                print(f"   已选择加载: {selected_profile['name']}", flush=True)
-                            else:
-                                logger.info("   无效的选择编号或超时。将不加载认证文件。")
-                                print("   无效的选择编号或超时。将不加载认证文件。", flush=True)
-                        except ValueError:
-                            logger.info("   无效的输入。将不加载认证文件。")
-                            print("   无效的输入。将不加载认证文件。", flush=True)
+        if final_launch_mode == 'debug':
+            # 对于调试模式，一律扫描全目录并提示用户选择，不自动使用任何文件
+            logger.info(f"  调试模式: 扫描全目录并提示用户从可用认证文件中选择...")
+        else:
+            # 对于无头模式，检查 active/ 目录中的默认认证文件
+            logger.info(f"  --active-auth-json 未提供。检查 '{ACTIVE_AUTH_DIR}' 中的默认认证文件...")
+            try:
+                if os.path.exists(ACTIVE_AUTH_DIR):
+                    active_json_files = sorted([
+                        f for f in os.listdir(ACTIVE_AUTH_DIR)
+                        if f.lower().endswith('.json') and os.path.isfile(os.path.join(ACTIVE_AUTH_DIR, f))
+                    ])
+                    if active_json_files:
+                        effective_active_auth_json_path = os.path.join(ACTIVE_AUTH_DIR, active_json_files[0])
+                        logger.info(f"  将使用 '{ACTIVE_AUTH_DIR}' 中按名称排序的第一个JSON文件: {os.path.basename(effective_active_auth_json_path)}")
                     else:
-                        logger.info("   好的，不加载认证文件或超时。")
-                        print("   好的，不加载认证文件或超时。", flush=True)
-                    print('-'*60, flush=True)
+                        logger.info(f"  目录 '{ACTIVE_AUTH_DIR}' 为空或不包含JSON文件。")
                 else:
-                    logger.info("   未找到认证文件。将使用浏览器当前状态。")
-                    print("   未找到认证文件。将使用浏览器当前状态。", flush=True)
+                    logger.info(f"  目录 '{ACTIVE_AUTH_DIR}' 不存在。")
+            except Exception as e_scan_active:
+                logger.warning(f"  扫描 '{ACTIVE_AUTH_DIR}' 时发生错误: {e_scan_active}", exc_info=True)
+
+        # 处理 debug 模式的用户选择逻辑
+        if final_launch_mode == 'debug':
+            # 对于调试模式，一律扫描全目录并提示用户选择
+            available_profiles = []
+            # 首先扫描 ACTIVE_AUTH_DIR，然后是 SAVED_AUTH_DIR
+            for profile_dir_path_str, dir_label in [(ACTIVE_AUTH_DIR, "active"), (SAVED_AUTH_DIR, "saved")]:
+                if os.path.exists(profile_dir_path_str):
+                    try:
+                        # 在每个目录中对文件名进行排序
+                        filenames = sorted([
+                            f for f in os.listdir(profile_dir_path_str)
+                            if f.lower().endswith(".json") and os.path.isfile(os.path.join(profile_dir_path_str, f))
+                        ])
+                        for filename in filenames:
+                            full_path = os.path.join(profile_dir_path_str, filename)
+                            available_profiles.append({"name": f"{dir_label}/{filename}", "path": full_path})
+                    except OSError as e:
+                        logger.warning(f"   ⚠️ 警告: 无法读取目录 '{profile_dir_path_str}': {e}")
+
+            if available_profiles:
+                # 对可用配置文件列表进行排序，以确保一致的显示顺序
+                available_profiles.sort(key=lambda x: x['name'])
+                print('-'*60 + "\n   找到以下可用的认证文件:", flush=True)
+                for i, profile in enumerate(available_profiles): print(f"     {i+1}: {profile['name']}", flush=True)
+                print("     N: 不加载任何文件 (使用浏览器当前状态)\n" + '-'*60, flush=True)
+                choice = input_with_timeout(f"   请选择要加载的认证文件编号 (输入 N 或直接回车则不加载, {args.auth_save_timeout}s超时): ", args.auth_save_timeout)
+                if choice.strip().lower() not in ['n', '']:
+                    try:
+                        choice_index = int(choice.strip()) - 1
+                        if 0 <= choice_index < len(available_profiles):
+                            selected_profile = available_profiles[choice_index]
+                            effective_active_auth_json_path = selected_profile["path"]
+                            logger.info(f"   已选择加载认证文件: {selected_profile['name']}")
+                            print(f"   已选择加载: {selected_profile['name']}", flush=True)
+                        else:
+                            logger.info("   无效的选择编号或超时。将不加载认证文件。")
+                            print("   无效的选择编号或超时。将不加载认证文件。", flush=True)
+                    except ValueError:
+                        logger.info("   无效的输入。将不加载认证文件。")
+                        print("   无效的输入。将不加载认证文件。", flush=True)
+                else:
+                    logger.info("   好的，不加载认证文件或超时。")
+                    print("   好的，不加载认证文件或超时。", flush=True)
+                print('-'*60, flush=True)
+            else:
+                logger.info("   未找到认证文件。将使用浏览器当前状态。")
+                print("   未找到认证文件。将使用浏览器当前状态。", flush=True)
+        elif not effective_active_auth_json_path:
+            # 对于无头模式，如果 --active-auth-json 未提供且 active/ 为空，则报错
+            logger.error(f"  ❌ {final_launch_mode} 模式错误: --active-auth-json 未提供，且活动认证目录 '{ACTIVE_AUTH_DIR}' 中未找到任何 '.json' 认证文件。请先在调试模式下保存一个或通过参数指定。")
+            sys.exit(1)
 
     # 构建 Camoufox 内部启动命令 (from dev)
     camoufox_internal_cmd_args = [

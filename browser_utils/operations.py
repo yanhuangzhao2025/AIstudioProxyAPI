@@ -5,6 +5,7 @@ import asyncio
 import time
 import json
 import os
+import re
 import logging
 from typing import Optional, Any, List, Dict, Callable, Set
 
@@ -52,6 +53,130 @@ async def get_raw_text_content(response_element: Locator, previous_text: str, re
             preview = raw_text[:100].replace('\n', '\\n')
             logger.debug(f"[{req_id}] (获取原始文本) 文本已更新，长度: {len(raw_text)}，预览: '{preview}...'")
     return raw_text
+
+def _parse_userscript_models(script_content: str):
+    """从油猴脚本中解析模型列表 - 使用JSON解析方式"""
+    try:
+        # 查找脚本版本号
+        version_pattern = r'const\s+SCRIPT_VERSION\s*=\s*[\'"]([^\'"]+)[\'"]'
+        version_match = re.search(version_pattern, script_content)
+        script_version = version_match.group(1) if version_match else "v1.6"
+
+        # 查找 MODELS_TO_INJECT 数组的内容
+        models_array_pattern = r'const\s+MODELS_TO_INJECT\s*=\s*(\[.*?\]);'
+        models_match = re.search(models_array_pattern, script_content, re.DOTALL)
+
+        if not models_match:
+            logger.warning("未找到 MODELS_TO_INJECT 数组")
+            return []
+
+        models_js_code = models_match.group(1)
+
+        # 将JavaScript数组转换为JSON格式
+        # 1. 替换模板字符串中的变量
+        models_js_code = models_js_code.replace('${SCRIPT_VERSION}', script_version)
+
+        # 2. 移除JavaScript注释
+        models_js_code = re.sub(r'//.*?$', '', models_js_code, flags=re.MULTILINE)
+
+        # 3. 将JavaScript对象转换为JSON格式
+        # 移除尾随逗号
+        models_js_code = re.sub(r',\s*([}\]])', r'\1', models_js_code)
+
+        # 替换单引号为双引号
+        models_js_code = re.sub(r"(\w+):\s*'([^']*)'", r'"\1": "\2"', models_js_code)
+        # 替换反引号为双引号
+        models_js_code = re.sub(r'(\w+):\s*`([^`]*)`', r'"\1": "\2"', models_js_code)
+        # 确保属性名用双引号
+        models_js_code = re.sub(r'(\w+):', r'"\1":', models_js_code)
+
+        # 4. 解析JSON
+        import json
+        models_data = json.loads(models_js_code)
+
+        models = []
+        for model_obj in models_data:
+            if isinstance(model_obj, dict) and 'name' in model_obj:
+                models.append({
+                    'name': model_obj.get('name', ''),
+                    'displayName': model_obj.get('displayName', ''),
+                    'description': model_obj.get('description', '')
+                })
+
+        logger.info(f"成功解析 {len(models)} 个模型从油猴脚本")
+        return models
+
+    except Exception as e:
+        logger.error(f"解析油猴脚本模型列表失败: {e}")
+        return []
+
+
+def _get_injected_models():
+    """从油猴脚本中获取注入的模型列表，转换为API格式"""
+    try:
+        # 直接读取环境变量，避免复杂的导入
+        enable_injection = os.environ.get('ENABLE_SCRIPT_INJECTION', 'true').lower() in ('true', '1', 'yes')
+
+        if not enable_injection:
+            return []
+
+        # 获取脚本文件路径
+        script_path = os.environ.get('USERSCRIPT_PATH', 'browser_utils/more_modles.js')
+
+        # 检查脚本文件是否存在
+        if not os.path.exists(script_path):
+            # 脚本文件不存在，静默返回空列表
+            return []
+
+        # 读取油猴脚本内容
+        with open(script_path, 'r', encoding='utf-8') as f:
+            script_content = f.read()
+
+        # 从脚本中解析模型列表
+        models = _parse_userscript_models(script_content)
+
+        if not models:
+            return []
+
+        # 转换为API格式
+        injected_models = []
+        for model in models:
+            model_name = model.get('name', '')
+            if not model_name:
+                continue  # 跳过没有名称的模型
+
+            if model_name.startswith('models/'):
+                simple_id = model_name[7:]  # 移除 'models/' 前缀
+            else:
+                simple_id = model_name
+
+            display_name = model.get('displayName', model.get('display_name', simple_id))
+            description = model.get('description', f'Injected model: {simple_id}')
+
+            # 注意：不再清理显示名称，保留原始的emoji和版本信息
+
+            model_entry = {
+                "id": simple_id,
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "ai_studio_injected",
+                "display_name": display_name,
+                "description": description,
+                "raw_model_path": model_name,
+                "default_temperature": 1.0,
+                "default_max_output_tokens": 65536,
+                "supported_max_output_tokens": 65536,
+                "default_top_p": 0.95,
+                "injected": True  # 标记为注入的模型
+            }
+            injected_models.append(model_entry)
+
+        return injected_models
+
+    except Exception as e:
+        # 静默处理错误，不输出日志，返回空列表
+        return []
+
 
 async def _handle_model_list_response(response: Any):
     """处理模型列表响应"""
@@ -236,6 +361,23 @@ async def _handle_model_list_response(response: Any):
                         logger.debug(f"Skipping entry due to invalid model_id_path: {model_id_path_str} from entry {str(entry_in_container)[:100]}")
                 
                 if new_parsed_list:
+                    # 检查是否已经有通过网络拦截注入的模型
+                    has_network_injected_models = False
+                    if models_array_container:
+                        for entry_in_container in models_array_container:
+                            if isinstance(entry_in_container, list) and len(entry_in_container) > 10:
+                                # 检查是否有网络注入标记
+                                if "__NETWORK_INJECTED__" in entry_in_container:
+                                    has_network_injected_models = True
+                                    break
+
+                    if has_network_injected_models and not is_in_login_flow:
+                        logger.info("检测到网络拦截已注入模型")
+
+                    # 注意：不再在后端添加注入模型
+                    # 因为如果前端没有通过网络拦截注入，说明前端页面上没有这些模型
+                    # 后端返回这些模型也无法实际使用，所以只依赖网络拦截注入
+
                     server.parsed_model_list = sorted(new_parsed_list, key=lambda m: m.get('display_name', '').lower())
                     server.global_model_list_raw_json = json.dumps({"data": server.parsed_model_list, "object": "list"})
                     if DEBUG_LOGS_ENABLED:
@@ -243,7 +385,7 @@ async def _handle_model_list_response(response: Any):
                         for i, item in enumerate(server.parsed_model_list[:min(3, len(server.parsed_model_list))]):
                             log_output += f"  Model {i+1}: ID={item.get('id')}, Name={item.get('display_name')}, Temp={item.get('default_temperature')}, MaxTokDef={item.get('default_max_output_tokens')}, MaxTokSup={item.get('supported_max_output_tokens')}, TopP={item.get('default_top_p')}\n"
                         logger.info(log_output)
-                    if model_list_fetch_event and not model_list_fetch_event.is_set(): 
+                    if model_list_fetch_event and not model_list_fetch_event.is_set():
                         model_list_fetch_event.set()
                 elif not server.parsed_model_list:
                     logger.warning("解析后模型列表仍然为空。")
