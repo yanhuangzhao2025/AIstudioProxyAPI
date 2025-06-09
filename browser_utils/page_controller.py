@@ -432,8 +432,6 @@ class PageController:
                     continue
                 else:
                     raise
-            finally:
-
 
             await self._check_disconnect(check_client_disconnected, f"清空聊天 - 消失检查尝试 {attempt_disappear + 1} 后")
 
