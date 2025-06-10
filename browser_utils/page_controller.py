@@ -479,7 +479,7 @@ class PageController:
                     #    当文件选择器出现时，它会得到 FileChooser 对象
                     function_btn_localtor = self.page.locator('button[aria-label="Insert assets such as images, videos, files, or audio"]')
                     await function_btn_localtor.click()
-                    asyncio.sleep(0.5)
+                    #asyncio.sleep(0.5)
                     async with self.page.expect_file_chooser() as fc_info:
                         # 2. 点击那个会触发文件选择的普通按钮
                         upload_btn_localtor = self.page.locator(UPLOAD_BUTTON_SELECTOR)
@@ -494,7 +494,7 @@ class PageController:
                     await file_chooser.set_files(image_list)
                     print(f"已将 '{image_list}' 设置到文件选择器。")
 
-                    asyncio.sleep(0.2)
+                    #asyncio.sleep(0.2)
                     acknow_btn_locator = self.page.locator('button[aria-label="Agree to the copyright acknowledgement"]')
                     if await acknow_btn_locator.count() > 0:
                         await acknow_btn_locator.click()
