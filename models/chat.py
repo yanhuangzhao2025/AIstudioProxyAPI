@@ -13,11 +13,13 @@ class ToolCall(BaseModel):
     type: str = "function"
     function: FunctionCall
 
+class ImageURL(BaseModel):
+    url: str
 
 class MessageContentItem(BaseModel):
     type: str
     text: Optional[str] = None
-
+    image_url: Optional[ImageURL] = None
 
 class Message(BaseModel):
     role: str

@@ -198,7 +198,7 @@ async def _process_request_refactored(
             raise HTTPException(status_code=400, detail=f"[{req_id}] 无效请求: {e}")
         
         # 准备提示
-        prepared_prompt = prepare_combined_prompt(request.messages, req_id)
+        prepared_prompt,image_list = prepare_combined_prompt(request.messages, req_id)
         check_client_disconnected("After Prompt Prep: ")
         
         # 这里需要添加完整的处理逻辑 - 由于函数太长，暂时返回简化响应
