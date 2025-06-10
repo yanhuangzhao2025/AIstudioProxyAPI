@@ -4,6 +4,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     container_name: ai-studio-proxy-container
+    mem_limit: ${DOCKER_MEMORY_LIMIT}
+    memswap_limit: ${DOCKER_MEMSWAP_LIMIT}
     ports:
       - "${HOST_FASTAPI_PORT:-8080}:${DEFAULT_FASTAPI_PORT:-2048}"
       - "${HOST_STREAM_PORT:-8081}:${STREAM_PORT:-3120}"
