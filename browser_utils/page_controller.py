@@ -494,6 +494,11 @@ class PageController:
                     await file_chooser.set_files(image_list)
                     print(f"已将 '{image_list}' 设置到文件选择器。")
 
+                    asyncio.sleep(0.2)
+                    acknow_btn_locator = self.page.locator('button[aria-label="Agree to the copyright acknowledgement"]')
+                    if await acknow_btn_locator.count() > 0:
+                        await acknow_btn_locator.click()
+
                 except Exception as e:
                     print(f"在上传文件时发生错误: {e}")
 
