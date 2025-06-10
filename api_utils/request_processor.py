@@ -833,7 +833,7 @@ async def _process_request_refactored(
         await _handle_model_switching(req_id, context, check_client_disconnected)
         await _handle_parameter_cache(req_id, context)
         
-        prepared_prompt = await _prepare_and_validate_request(req_id, request, check_client_disconnected)
+        prepared_prompt,image_list = await _prepare_and_validate_request(req_id, request, check_client_disconnected)
 
         # 使用PageController处理页面交互
         # 注意：聊天历史清空已移至队列处理锁释放后执行
@@ -850,7 +850,7 @@ async def _process_request_refactored(
         # 优化：在提交提示前再次检查客户端连接，避免不必要的后台请求
         check_client_disconnected("提交提示前最终检查")
 
-        await page_controller.submit_prompt(prepared_prompt, check_client_disconnected)
+        await page_controller.submit_prompt(prepared_prompt,image_list, check_client_disconnected)
         
         # 响应处理仍然需要在这里，因为它决定了是流式还是非流式，并设置future
         response_result = await _handle_response_processing(

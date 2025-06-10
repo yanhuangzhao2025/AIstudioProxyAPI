@@ -10,7 +10,11 @@ import datetime
 from typing import Any, Dict, List, Optional, AsyncGenerator
 from asyncio import Queue
 from models import Message
-
+import re
+import base64
+import requests
+import os
+import hashlib
 
 
 # --- SSE生成函数 ---
@@ -194,6 +198,48 @@ def validate_chat_request(messages: List[Message], req_id: str) -> Dict[str, Opt
     }
 
 
+def extract_base64_to_local(base64_data: str) -> str:
+    output_dir = os.path.join(os.path.dirname(__file__), '..', 'upload_images')
+    match = re.match(r"data:image/(\w+);base64,(.*)", base64_data)
+    if not match:
+        print("错误: Base64 数据格式不正确。")
+        return None
+
+    image_type = match.group(1)  # 例如 "png", "jpeg"
+    encoded_image_data = match.group(2)
+
+    try:
+        # 解码 Base64 字符串
+        decoded_image_data = base64.b64decode(encoded_image_data)
+    except base64.binascii.Error as e:
+        print(f"错误: Base64 解码失败 - {e}")
+        return None
+
+    # 计算图片数据的 MD5 值
+    md5_hash = hashlib.md5(decoded_image_data).hexdigest()
+
+    # 确定文件扩展名和完整文件路径
+    file_extension = f".{image_type}"
+    output_filepath = os.path.join(output_dir, f"{md5_hash}{file_extension}")
+
+    # 确保输出目录存在
+    os.makedirs(output_dir, exist_ok=True)
+
+    if os.path.exists(output_filepath):
+        print(f"文件已存在，跳过保存: {output_filepath}")
+        return output_filepath
+
+    # 保存图片到文件
+    try:
+        with open(output_filepath, "wb") as f:
+            f.write(decoded_image_data)
+        print(f"图片已成功保存到: {output_filepath}")
+        return output_filepath
+    except IOError as e:
+        print(f"错误: 保存文件失败 - {e}")
+        return None
+
+
 # --- 提示准备函数 ---
 def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
     """准备组合提示"""
@@ -238,6 +284,7 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
         role = msg.role or 'unknown'
         role_prefix_ui = f"{role_map_ui.get(role, role.capitalize())}:\n"
         current_turn_parts = [role_prefix_ui]
+        images_list = []
         
         content = msg.content or ''
         content_str = ""
@@ -252,6 +299,15 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
                     text_parts.append(item.text or '')
                 elif isinstance(item, dict) and item.get('type') == 'text':
                     text_parts.append(item.get('text', ''))
+                elif hasattr(item, 'type') and item.type == 'image_url':
+                    image_url_value = item.image_url.url
+                    if image_url_value.startswith("data:image/"):
+                        try:
+                            # 提取 Base64 字符串
+                            image_full_path = extract_base64_to_local(image_url_value)
+                            images_list.append(image_full_path)
+                        except (ValueError, requests.exceptions.RequestException, Exception) as e:
+                            print(f"处理 Base64 图片并上传到 Imgur 失败: {e}")
                 else:
                     logger.warning(f"[{req_id}] (准备提示) 警告: 在索引 {i} 的消息中忽略非文本或未知类型的 content item")
             content_str = "\n".join(text_parts).strip()
@@ -302,7 +358,7 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
     preview_text = final_prompt[:300].replace('\n', '\\n')
     logger.info(f"[{req_id}] (准备提示) 组合提示长度: {len(final_prompt)}。预览: '{preview_text}...'")
     
-    return final_prompt 
+    return final_prompt,images_list
 
 
 def estimate_tokens(text: str) -> int:
