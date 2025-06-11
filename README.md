@@ -28,7 +28,7 @@ This project is generously sponsored by ZMTO. Visit their website: [https://zmto
 
 ## 系统要求
 
-*   **Python**: 3.9+ (推荐 3.10+ 或 3.11+)
+*   **Python**: >=3.9, <4.0 (由 Poetry 管理)
 *   **操作系统**: Windows, macOS, Linux (完全跨平台支持)
 *   **内存**: 建议 2GB+ 可用内存
 *   **网络**: 稳定的互联网连接访问 Google AI Studio
@@ -158,12 +158,36 @@ python launch_camoufox.py --headless
 
 ### 快速开始
 
-1. **安装**: 参见 [安装指南](docs/installation-guide.md)
-2. **配置**: 参见 [环境变量配置指南](docs/environment-configuration.md) - **推荐先配置**
-3. **首次认证**: 参见 [认证设置指南](docs/authentication-setup.md)
-4. **日常运行**: 参见 [日常运行指南](docs/daily-usage.md)
-5. **API使用**: 参见 [API使用指南](docs/api-usage.md)
-6. **Web界面**: 参见 [Web UI使用指南](docs/webui-guide.md)
+本项目现在使用 [Poetry](https://python-poetry.org/) 进行依赖管理。
+
+1.  **安装 Poetry**:
+    如果您尚未安装 Poetry，请参照其官方文档进行安装：[Poetry Installation](https://python-poetry.org/docs/#installation)。
+
+2.  **克隆项目**:
+    ```bash
+    git clone https://github.com/CJackHwang/AIstudioProxyAPI.git
+    cd AIstudioProxyAPI
+    ```
+
+3.  **安装依赖**:
+    使用 Poetry 安装项目依赖。这会自动创建一个虚拟环境（如果当前没有激活的虚拟环境）。
+    ```bash
+    poetry install
+    ```
+
+4.  **激活虚拟环境 (可选但推荐)**:
+    要激活 Poetry 创建的虚拟环境，请运行：
+    ```bash
+    poetry shell
+    ```
+    之后，您可以直接运行 Python 脚本 (例如 `python gui_launcher.py`)。
+    或者，如果您不想激活 shell，可以在每个命令前加上 `poetry run` (例如 `poetry run python gui_launcher.py`)。
+
+5.  **配置**: 参见 [环境变量配置指南](docs/environment-configuration.md) - **推荐先配置**
+6.  **首次认证**: 参见 [认证设置指南](docs/authentication-setup.md)
+7.  **日常运行**: 参见 [日常运行指南](docs/daily-usage.md) (请使用 `poetry run python launch_camoufox.py` 或在 `poetry shell` 中运行 `python launch_camoufox.py`)
+8.  **API使用**: 参见 [API使用指南](docs/api-usage.md)
+9.  **Web界面**: 参见 [Web UI使用指南](docs/webui-guide.md)
 
 ### 详细文档
 
