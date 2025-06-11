@@ -25,7 +25,7 @@ curl -sSL https://install.python-poetry.org | python3 -
 poetry install --with dev
 
 # 4. 激活虚拟环境
-poetry shell
+poetry env activate
 
 # 5. 安装 Pyright (可选，用于类型检查)
 npm install -g pyright
@@ -126,7 +126,7 @@ poetry env info
 poetry env info --path
 
 # 激活虚拟环境
-poetry shell
+poetry env activate
 
 # 在虚拟环境中运行命令
 poetry run python script.py

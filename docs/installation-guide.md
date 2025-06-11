@@ -83,7 +83,7 @@ poetry install --with dev
 
 ```bash
 # 激活 Poetry 创建的虚拟环境
-poetry shell
+poetry env activate
 
 # 或者在每个命令前加上 poetry run
 poetry run python --version

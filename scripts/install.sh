@@ -155,7 +155,7 @@ show_next_steps() {
     echo
     echo "后续步骤："
     echo "1. 进入项目目录: cd AIstudioProxyAPI"
-    echo "2. 激活虚拟环境: poetry shell"
+    echo "2. 激活虚拟环境: poetry env activate"
     echo "3. 配置环境变量: nano .env"
     echo "4. 首次认证设置: python launch_camoufox.py --debug"
     echo "5. 日常运行: python launch_camoufox.py --headless"
