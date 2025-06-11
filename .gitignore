@@ -218,8 +218,8 @@ errors_py/
 logs/
 
 # Authentication Profiles (Sensitive)
-auth_profiles/active/
-auth_profiles/saved/
+auth_profiles/active/*
+auth_profiles/saved/*
 
 # Camoufox/Playwright Profile Data (Assume these are generated/temporary)
 camoufox_profile/
