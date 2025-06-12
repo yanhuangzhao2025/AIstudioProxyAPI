@@ -213,7 +213,7 @@ function Show-NextSteps {
     Write-Host ""
     Write-Host "后续步骤："
     Write-Host "1. 进入项目目录: cd AIstudioProxyAPI"
-    Write-Host "2. 激活虚拟环境: poetry shell"
+    Write-Host "2. 激活虚拟环境: poetry env activate"
     Write-Host "3. 配置环境变量: notepad .env"
     Write-Host "4. 首次认证设置: poetry run python launch_camoufox.py --debug"
     Write-Host "5. 日常运行: poetry run python launch_camoufox.py --headless"

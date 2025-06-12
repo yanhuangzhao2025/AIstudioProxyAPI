@@ -203,7 +203,7 @@ iwr -useb https://raw.githubusercontent.com/CJackHwang/AIstudioProxyAPI/main/scr
 4.  **激活虚拟环境**:
     ```bash
     # 方式1: 激活 shell (推荐日常开发)
-    poetry shell
+    poetry env activate
 
     # 方式2: 直接运行命令 (推荐自动化脚本)
     poetry run python gui_launcher.py
