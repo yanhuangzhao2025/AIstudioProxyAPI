@@ -219,7 +219,9 @@ logs/
 
 # Authentication Profiles (Sensitive)
 auth_profiles/active/*
+!auth_profiles/active/.gitkeep
 auth_profiles/saved/*
+!auth_profiles/saved/.gitkeep
 
 # Camoufox/Playwright Profile Data (Assume these are generated/temporary)
 camoufox_profile/
