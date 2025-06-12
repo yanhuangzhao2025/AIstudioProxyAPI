@@ -3,7 +3,7 @@ PageController模块
 封装了所有与Playwright页面直接交互的复杂逻辑。
 """
 import asyncio
-from typing import Callable, List, Dict, Any
+from typing import Callable, List, Dict, Any, Optional
 
 from playwright.async_api import Page as AsyncPage, expect as expect_async, TimeoutError
 
@@ -12,7 +12,9 @@ from config import (
     MAT_CHIP_REMOVE_BUTTON_SELECTOR, TOP_P_INPUT_SELECTOR, SUBMIT_BUTTON_SELECTOR,
     CLEAR_CHAT_BUTTON_SELECTOR, CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR, OVERLAY_SELECTOR,
     PROMPT_TEXTAREA_SELECTOR, RESPONSE_CONTAINER_SELECTOR, RESPONSE_TEXT_SELECTOR,
-    EDIT_MESSAGE_BUTTON_SELECTOR,USE_URL_CONTEXT_SELECTOR,UPLOAD_BUTTON_SELECTOR
+    EDIT_MESSAGE_BUTTON_SELECTOR,USE_URL_CONTEXT_SELECTOR,UPLOAD_BUTTON_SELECTOR,
+    SET_THINKING_BUDGET_TOGGLE_SELECTOR, THINKING_BUDGET_INPUT_SELECTOR,
+    GROUNDING_WITH_GOOGLE_SEARCH_TOGGLE_SELECTOR
 )
 from config import (
     CLICK_TIMEOUT_MS, WAIT_FOR_ELEMENT_TIMEOUT_MS, CLEAR_CHAT_VERIFY_TIMEOUT_MS,
@@ -62,6 +64,116 @@ class PageController:
         # 调整URL CONTEXT
         await self._open_url_content(check_client_disconnected)
 
+        # 调整“思考预算”开关
+        await self._set_thinking_budget_toggle_checked(check_client_disconnected)
+
+        # 在函数末尾，await self._set_thinking_budget_toggle_checked(...) 之后添加:
+        self.logger.info(f"[{self.req_id}] 检查预算...{request_params.get('reasoning_effort')}")
+        if 'reasoning_effort' in request_params:
+            await self._adjust_thinking_budget(request_params.get('reasoning_effort'), check_client_disconnected)
+
+        # 调整 Google Search 开关
+        await self._adjust_google_search(request_params, check_client_disconnected)
+
+    async def _adjust_thinking_budget(self, reasoning_effort: Optional[str], check_client_disconnected: Callable):
+        """根据 reasoning_effort 调整思考预算。"""
+        self.logger.info(f"[{self.req_id}] 检查并调整思考预算...")
+        
+        token_budget = None
+        if reasoning_effort is None or reasoning_effort.lower() == 'none':
+            token_budget = 8192
+            self.logger.info(f"[{self.req_id}] 'reasoning_effort' 为空或 'none'，使用默认思考预算: {token_budget}")
+        else:
+            effort_map = {
+                "low": 1000,
+                "medium": 8000,
+                "high": 24000
+            }
+            token_budget = effort_map.get(reasoning_effort.lower())
+
+        if not token_budget:
+            self.logger.warning(f"[{self.req_id}] 无效的 reasoning_effort 值: '{reasoning_effort}'。跳过调整。")
+            return
+
+        budget_input_locator = self.page.locator(THINKING_BUDGET_INPUT_SELECTOR)
+        
+        try:
+            await expect_async(budget_input_locator).to_be_visible(timeout=5000)
+            await self._check_disconnect(check_client_disconnected, "思考预算调整 - 输入框可见后")
+            
+            self.logger.info(f"[{self.req_id}] 设置思考预算为: {token_budget}")
+            await budget_input_locator.fill(str(token_budget), timeout=5000)
+            await self._check_disconnect(check_client_disconnected, "思考预算调整 - 填充输入框后")
+
+            # 验证
+            await asyncio.sleep(0.1)
+            new_value_str = await budget_input_locator.input_value(timeout=3000)
+            if int(new_value_str) == token_budget:
+                self.logger.info(f"[{self.req_id}] ✅ 思考预算已成功更新为: {new_value_str}")
+            else:
+                self.logger.warning(f"[{self.req_id}] ⚠️ 思考预算更新后验证失败。页面显示: {new_value_str}, 期望: {token_budget}")
+
+        except Exception as e:
+            self.logger.error(f"[{self.req_id}] ❌ 调整思考预算时出错: {e}")
+            if isinstance(e, ClientDisconnectedError):
+                raise
+
+    async def _adjust_google_search(self, request_params: Dict[str, Any], check_client_disconnected: Callable):
+        """根据请求参数中的 'googleSearch' 工具存在与否，双向控制 Google Search 开关。"""
+        self.logger.info(f"[{self.req_id}] 检查并调整 Google Search 开关...")
+
+        tools = request_params.get('tools')
+        has_google_search = False
+        if isinstance(tools, list):
+            for tool in tools:
+                if isinstance(tool, dict) and tool.get('function', {}).get('name') == 'googleSearch':
+                    has_google_search = True
+                    break
+        
+        toggle_selector = GROUNDING_WITH_GOOGLE_SEARCH_TOGGLE_SELECTOR
+        
+        try:
+            toggle_locator = self.page.locator(toggle_selector)
+            await expect_async(toggle_locator).to_be_visible(timeout=5000)
+            await self._check_disconnect(check_client_disconnected, "Google Search 开关 - 元素可见后")
+
+            is_checked_str = await toggle_locator.get_attribute("aria-checked")
+            self.logger.info(f"[{self.req_id}] Google Search 开关 'aria-checked' 状态: '{is_checked_str}'。是否需要搜索: {has_google_search}")
+
+            if has_google_search:
+                # 需要搜索，但开关是关闭的，则打开它
+                if is_checked_str == "false":
+                    self.logger.info(f"[{self.req_id}] 'googleSearch' 工具存在，但开关关闭。正在点击以打开...")
+                    await toggle_locator.click(timeout=CLICK_TIMEOUT_MS)
+                    await self._check_disconnect(check_client_disconnected, "Google Search 开关 - 点击打开后")
+                    await asyncio.sleep(0.5) # 等待UI更新
+                    new_state = await toggle_locator.get_attribute("aria-checked")
+                    if new_state == "true":
+                        self.logger.info(f"[{self.req_id}] ✅ Google Search 开关已成功打开。")
+                    else:
+                        self.logger.warning(f"[{self.req_id}] ⚠️ Google Search 开关打开失败。当前状态: '{new_state}'")
+                else:
+                    self.logger.info(f"[{self.req_id}] 'googleSearch' 工具存在，且开关已打开，无需操作。")
+            else:
+                # 不需要搜索，但开关是打开的，则关闭它
+                if is_checked_str == "true":
+                    self.logger.info(f"[{self.req_id}] 'googleSearch' 工具不存在，但开关打开。正在点击以关闭...")
+                    await toggle_locator.click(timeout=CLICK_TIMEOUT_MS)
+                    await self._check_disconnect(check_client_disconnected, "Google Search 开关 - 点击关闭后")
+                    await asyncio.sleep(0.5) # 等待UI更新
+                    new_state = await toggle_locator.get_attribute("aria-checked")
+                    if new_state == "false":
+                        self.logger.info(f"[{self.req_id}] ✅ Google Search 开关已成功关闭。")
+                    else:
+                        self.logger.warning(f"[{self.req_id}] ⚠️ Google Search 开关关闭失败。当前状态: '{new_state}'")
+                else:
+                    self.logger.info(f"[{self.req_id}] 'googleSearch' 工具不存在，且开关已关闭，无需操作。")
+
+        except Exception as e:
+            self.logger.error(f"[{self.req_id}] ❌ 操作 'Google Search toggle' 开关 '{toggle_selector}' 时发生错误: {e}")
+            if isinstance(e, ClientDisconnectedError):
+                 raise
+
     async def _open_url_content(self,check_client_disconnected: Callable):
         try:
             collapse_tools_locator = self.page.locator('button[aria-label="Expand or collapse tools"]')
@@ -84,6 +196,53 @@ class PageController:
         except Exception as e:
             self.logger.error(f"[{self.req_id}] ❌ 操作USE_URL_CONTEXT_SELECTOR时发生错误:{e}。")
 
+    async def _set_thinking_budget_toggle_checked(self, check_client_disconnected: Callable):
+        """
+        确保 "Thinking Budget" 滑块开关处于选中状态。
+        """
+        toggle_selector = SET_THINKING_BUDGET_TOGGLE_SELECTOR
+        self.logger.info(f"[{self.req_id}] 检查并设置 'Thinking Budget toggle' 滑块开关 '{toggle_selector}' 的状态...")
+
+        try:
+            toggle_locator = self.page.locator(toggle_selector)
+            
+            # 等待元素在 DOM 中可见
+            await expect_async(toggle_locator).to_be_visible(timeout=5000)
+            await self._check_disconnect(check_client_disconnected, "思考预算开关 - 元素可见后")
+
+            # 1. 检查当前 'aria-checked' 属性
+            is_checked = await toggle_locator.get_attribute("aria-checked")
+            self.logger.info(f"[{self.req_id}] 思考预算开关当前 'aria-checked' 状态: {is_checked}")
+
+            # 2. 如果开关未选中 (aria-checked="false")，则点击它
+            if is_checked == "false":
+                self.logger.info(f"[{self.req_id}] 思考预算开关当前未选中，正在点击以启用...")
+                await toggle_locator.click(timeout=CLICK_TIMEOUT_MS)
+                await self._check_disconnect(check_client_disconnected, "思考预算开关 - 点击后")
+                
+                # 3. 验证操作是否成功
+                await asyncio.sleep(0.5)  # 短暂等待，让 UI 状态更新
+                new_state = await toggle_locator.get_attribute("aria-checked")
+                if new_state == "true":
+                    self.logger.info(f"[{self.req_id}] ✅ 'Thinking Budget toggle' 已成功启用。新状态: {new_state}")
+                else:
+                    self.logger.warning(f"[{self.req_id}] ⚠️ 'Thinking Budget toggle' 点击后验证失败。期望状态: 'true', 实际状态: '{new_state}'")
+                    # 如果需要，可以在此处添加错误快照
+                    # await save_error_snapshot(f"thinking_budget_toggle_verify_fail_{self.req_id}")
+
+            elif is_checked == "true":
+                self.logger.info(f"[{self.req_id}] 'Thinking Budget toggle' 已处于选中状态，无需操作。")
+            else:
+                # 处理 'aria-checked' 属性不存在或值无效的情况
+                self.logger.warning(f"[{self.req_id}] 无法确定 'Thinking Budget toggle' 的状态，'aria-checked' 值为: '{is_checked}'。")
+
+        except Exception as e:
+            self.logger.error(f"[{self.req_id}] ❌ 操作 'Thinking Budget toggle' 滑块开关 '{toggle_selector}' 时发生错误: {e}")
+            # 如果需要，可以在此处添加错误快照
+            # await save_error_snapshot(f"thinking_budget_toggle_error_{self.req_id}")
+            # 如果是客户端断开连接的特定错误，则重新抛出
+            if isinstance(e, ClientDisconnectedError):
+                 raise
     async def _adjust_temperature(self, temperature: float, page_params_cache: dict, params_cache_lock: asyncio.Lock, check_client_disconnected: Callable):
         """调整温度参数。"""
         async with params_cache_lock:
