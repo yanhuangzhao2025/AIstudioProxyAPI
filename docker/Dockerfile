@@ -9,11 +9,20 @@ RUN apt-get update && \
     supervisor curl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Install Poetry
+ENV POETRY_HOME="/opt/poetry"
+ENV POETRY_VERSION=1.8.3
+RUN curl -sSL https://install.python-poetry.org | python3 - --version ${POETRY_VERSION} 
+ENV PATH="${POETRY_HOME}/bin:${PATH}"
+
 WORKDIR /app_builder
-COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -U "camoufox[geoip]" && \
-    pip install --no-cache-dir -r requirements.txt
+
+# Copy Poetry project files
+COPY pyproject.toml poetry.lock ./
+
+# Configure Poetry to not create virtualenvs and install dependencies
+RUN poetry config virtualenvs.create false --local && \
+    poetry install --no-root --no-dev --no-interaction --no-ansi
 
 FROM python:3.10-slim-bookworm
 
@@ -28,11 +37,17 @@ RUN groupadd -r appgroup && useradd -r -g appgroup -s /bin/bash -d /app appuser
 
 WORKDIR /app
 
+# Copy installed packages and executables from builder stage
 COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
+COPY --from=builder /opt/poetry/bin/poetry /usr/local/bin/poetry
 
+# Copy application code
 COPY . .
 
+# Install Playwright browsers and dependencies, and fetch camoufox
+# Note: poetry is now available in the final image if needed for any build scripts,
+# but dependencies should already be installed.
 RUN camoufox fetch && \
     python -m playwright install firefox && \
     python -m playwright install-deps firefox
@@ -60,6 +75,8 @@ RUN mkdir -p /var/cache/camoufox && \
     ln -s /var/cache/camoufox /app/.cache/camoufox 
 #新增结束
 
+RUN python update_browserforge_data.py
+
 EXPOSE 2048
 EXPOSE 3120
 
@@ -69,7 +86,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
 
 ENV PYTHONUNBUFFERED=1
 
-# 默认环境变量 (可被 .env 文件或运行时环境变量覆盖)
+# Default environment variables (can be overridden by .env or runtime)
 ENV PORT=8000
 ENV DEFAULT_FASTAPI_PORT=2048
 ENV DEFAULT_CAMOUFOX_PORT=9222
@@ -78,7 +95,7 @@ ENV SERVER_LOG_LEVEL=INFO
 ENV DEBUG_LOGS_ENABLED=false
 ENV AUTO_CONFIRM_LOGIN=true
 
-# 向后兼容的环境变量
+# Backward compatibility
 ENV SERVER_PORT=2048
 ENV INTERNAL_CAMOUFOX_PROXY=""
 

@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict, Any
 from pydantic import BaseModel
 from config import MODEL_NAME
 
@@ -37,3 +37,5 @@ class ChatCompletionRequest(BaseModel):
     max_output_tokens: Optional[int] = None
     stop: Optional[Union[str, List[str]]] = None
     top_p: Optional[float] = None 
+    reasoning_effort: Optional[str] = None
+    tools: Optional[List[Dict[str, Any]]] = None

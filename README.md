@@ -28,7 +28,9 @@ This project is generously sponsored by ZMTO. Visit their website: [https://zmto
 
 ## 系统要求
 
-*   **Python**: 3.9+ (推荐 3.10+ 或 3.11+)
+*   **Python**: >=3.9, <4.0 (推荐 3.10+ 以获得最佳性能)
+*   **依赖管理**: [Poetry](https://python-poetry.org/) (现代化Python依赖管理工具)
+*   **类型检查**: [Pyright](https://github.com/microsoft/pyright) (可选，用于开发时类型检查)
 *   **操作系统**: Windows, macOS, Linux (完全跨平台支持)
 *   **内存**: 建议 2GB+ 可用内存
 *   **网络**: 稳定的互联网连接访问 Google AI Studio
@@ -47,6 +49,7 @@ This project is generously sponsored by ZMTO. Visit their website: [https://zmto
 *   **灵活认证系统**: 支持可选的API密钥认证，完全兼容OpenAI标准的Bearer token格式
 *   **模块化架构**: 采用清晰的模块化设计，便于维护和扩展
 *   **统一配置管理**: 基于 `.env` 文件的统一配置方式，支持环境变量覆盖
+*   **现代化开发工具**: 集成 Poetry 依赖管理和 Pyright 类型检查，提供优秀的开发体验
 
 ## 系统架构
 
@@ -158,26 +161,102 @@ python launch_camoufox.py --headless
 
 ### 快速开始
 
-1. **安装**: 参见 [安装指南](docs/installation-guide.md)
-2. **配置**: 参见 [环境变量配置指南](docs/environment-configuration.md) - **推荐先配置**
-3. **首次认证**: 参见 [认证设置指南](docs/authentication-setup.md)
-4. **日常运行**: 参见 [日常运行指南](docs/daily-usage.md)
-5. **API使用**: 参见 [API使用指南](docs/api-usage.md)
-6. **Web界面**: 参见 [Web UI使用指南](docs/webui-guide.md)
+本项目采用现代化的 Python 开发工具链，使用 [Poetry](https://python-poetry.org/) 进行依赖管理，[Pyright](https://github.com/microsoft/pyright) 进行类型检查。
 
-### 详细文档
+#### 🚀 一键安装脚本 (推荐)
 
+```bash
+# macOS/Linux 用户
+curl -sSL https://raw.githubusercontent.com/CJackHwang/AIstudioProxyAPI/main/scripts/install.sh | bash
+
+# Windows 用户 (PowerShell)
+iwr -useb https://raw.githubusercontent.com/CJackHwang/AIstudioProxyAPI/main/scripts/install.ps1 | iex
+```
+
+#### 📋 手动安装步骤
+
+1.  **安装 Poetry** (如果尚未安装):
+    ```bash
+    # macOS/Linux
+    curl -sSL https://install.python-poetry.org | python3 -
+
+    # Windows (PowerShell)
+    (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+
+    # 或使用包管理器
+    # macOS: brew install poetry
+    # Ubuntu/Debian: apt install python3-poetry
+    ```
+
+2.  **克隆项目**:
+    ```bash
+    git clone https://github.com/CJackHwang/AIstudioProxyAPI.git
+    cd AIstudioProxyAPI
+    ```
+
+3.  **安装依赖**:
+    Poetry 会自动创建虚拟环境并安装所有依赖：
+    ```bash
+    poetry install
+    ```
+
+4.  **激活虚拟环境**:
+    ```bash
+    # 方式1: 激活 shell (推荐日常开发)
+    poetry env activate
+
+    # 方式2: 直接运行命令 (推荐自动化脚本)
+    poetry run python gui_launcher.py
+    ```
+
+#### 🔧 后续配置步骤
+
+5.  **环境配置**: 参见 [环境变量配置指南](docs/environment-configuration.md) - **推荐先配置**
+6.  **首次认证**: 参见 [认证设置指南](docs/authentication-setup.md)
+7.  **日常运行**: 参见 [日常运行指南](docs/daily-usage.md)
+8.  **API使用**: 参见 [API使用指南](docs/api-usage.md)
+9.  **Web界面**: 参见 [Web UI使用指南](docs/webui-guide.md)
+
+#### 🛠️ 开发者选项
+
+如果您是开发者，还可以：
+
+```bash
+# 安装开发依赖 (包含类型检查、测试工具等)
+poetry install --with dev
+
+# 启用类型检查 (需要安装 pyright)
+npm install -g pyright
+pyright
+
+# 查看项目依赖树
+poetry show --tree
+
+# 更新依赖
+poetry update
+```
+
+### 📚 详细文档
+
+#### 🚀 快速上手
 - [安装指南](docs/installation-guide.md) - 详细的安装步骤和环境配置
 - [环境变量配置指南](docs/environment-configuration.md) - **.env 文件配置管理** ⭐
 - [认证设置指南](docs/authentication-setup.md) - 首次运行与认证文件设置
 - [日常运行指南](docs/daily-usage.md) - 日常使用和配置选项
+
+#### 🔧 功能使用
 - [API使用指南](docs/api-usage.md) - API端点和客户端配置
 - [Web UI使用指南](docs/webui-guide.md) - Web界面功能说明
-- [故障排除指南](docs/troubleshooting.md) - 常见问题解决方案
-- [高级配置指南](docs/advanced-configuration.md) - 高级功能和配置选项
 - [脚本注入指南](docs/script_injection_guide.md) - 油猴脚本动态挂载功能使用指南 (v3.0) 🆕
+
+#### ⚙️ 高级配置
+- [高级配置指南](docs/advanced-configuration.md) - 高级功能和配置选项
 - [日志控制指南](docs/logging-control.md) - 日志系统配置和调试
-- [依赖版本说明](docs/dependency-versions.md) - Python版本要求和依赖兼容性详解
+- [故障排除指南](docs/troubleshooting.md) - 常见问题解决方案
+
+#### 🛠️ 开发相关
+- [开发者指南](docs/development-guide.md) - Poetry、Pyright 和开发工作流程 🆕
+- [依赖版本说明](docs/dependency-versions.md) - Poetry 依赖管理和版本控制详解
 
 ## 客户端配置示例
 
@@ -193,13 +272,13 @@ python launch_camoufox.py --headless
 
 ---
 
-## Docker 部署
+## 🐳 Docker 部署
 
-本项目支持通过 Docker 进行部署，**现在完全支持 `.env` 配置文件**！
+本项目支持通过 Docker 进行部署，使用 **Poetry** 进行依赖管理，**完全支持 `.env` 配置文件**！
 
 > 📁 **注意**: 所有 Docker 相关文件已移至 `docker/` 目录，保持项目根目录整洁。
 
-### 快速 Docker 部署
+### 🚀 快速 Docker 部署
 
 ```bash
 # 1. 准备配置文件
@@ -210,20 +289,26 @@ nano .env  # 编辑配置
 # 2. 使用 Docker Compose 启动
 docker compose up -d
 
-# 3. 版本更新 (在 docker 目录下)
+# 3. 查看日志
+docker compose logs -f
+
+# 4. 版本更新 (在 docker 目录下)
 bash update.sh
 ```
 
-### 详细文档
+### 📚 详细文档
 
-- [Docker 部署指南 (docker/README-Docker.md)](docker/README-Docker.md) - 包含完整的 `.env` 配置说明
+- [Docker 部署指南 (docker/README-Docker.md)](docker/README-Docker.md) - 包含完整的 Poetry + `.env` 配置说明
 - [Docker 快速指南 (docker/README.md)](docker/README.md) - 快速开始指南
 
-### 重要说明
+### ✨ Docker 特性
 
+- ✅ **Poetry 依赖管理**: 使用现代化的 Python 依赖管理工具
+- ✅ **多阶段构建**: 优化镜像大小和构建速度
 - ✅ **配置统一**: 使用 `.env` 文件管理所有配置
 - ✅ **版本更新**: `bash update.sh` 即可完成更新
 - ✅ **目录整洁**: Docker 文件已移至 `docker/` 目录
+- ✅ **跨平台支持**: 支持 x86_64 和 ARM64 架构
 - ⚠️ **认证文件**: 首次运行需要在主机上获取认证文件，然后挂载到容器中
 
 ---

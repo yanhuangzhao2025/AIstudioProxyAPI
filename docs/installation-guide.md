@@ -1,100 +1,159 @@
 # 安装指南
 
-本文档提供详细的安装步骤和环境配置说明。
+本文档提供基于 Poetry 的详细安装步骤和环境配置说明。
 
-## 先决条件
+## 🔧 系统要求
 
-*   **Python**: 3.9 或更高版本 (强烈建议 3.10+ 或 3.11+)。
-    *   **推荐版本**: Python 3.10+ 或 3.11+ 以获得最佳性能和兼容性
+### 基础要求
+
+*   **Python**: 3.9+ (推荐 3.10+ 或 3.11+)
+    *   **推荐版本**: Python 3.11+ 以获得最佳性能和兼容性
     *   **最低要求**: Python 3.9 (支持所有当前依赖版本)
     *   **完全支持**: Python 3.9, 3.10, 3.11, 3.12, 3.13
-*   **pip**: Python 包管理器 (建议使用最新版本)。
-*   **(可选但推荐) Git**: 用于克隆仓库。
-*   **Google AI Studio 账号**: 并能正常访问和使用。
-*   **`xvfb` (仅当在 Linux 上使用 `--virtual-display` 模式时需要)**: X 虚拟帧缓冲器。
+*   **Poetry**: 1.4+ (现代化 Python 依赖管理工具)
+*   **Git**: 用于克隆仓库 (推荐)
+*   **Google AI Studio 账号**: 并能正常访问和使用
+*   **Node.js**: 16+ (可选，用于 Pyright 类型检查)
+
+### 系统依赖
+
+*   **Linux**: `xvfb` (虚拟显示，可选)
     *   Debian/Ubuntu: `sudo apt-get update && sudo apt-get install -y xvfb`
     *   Fedora: `sudo dnf install -y xorg-x11-server-Xvfb`
-    *   其他 Linux 发行版请参考其包管理器文档。
+*   **macOS**: 通常无需额外依赖
+*   **Windows**: 通常无需额外依赖
 
-## 安装步骤
+## 🚀 快速安装 (推荐)
 
-### 1. 克隆仓库
+### 一键安装脚本
 
 ```bash
-git clone https://github.com/CJackHwang/AIstudioProxyAPI
+# macOS/Linux 用户
+curl -sSL https://raw.githubusercontent.com/CJackHwang/AIstudioProxyAPI/main/scripts/install.sh | bash
+
+# Windows 用户 (PowerShell)
+iwr -useb https://raw.githubusercontent.com/CJackHwang/AIstudioProxyAPI/main/scripts/install.ps1 | iex
+```
+
+## 📋 手动安装步骤
+
+### 1. 安装 Poetry
+
+如果您尚未安装 Poetry，请先安装：
+
+```bash
+# macOS/Linux
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Windows (PowerShell)
+(Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | py -
+
+# 或使用包管理器
+# macOS: brew install poetry
+# Ubuntu/Debian: apt install python3-poetry
+# Windows: winget install Python.Poetry
+```
+
+### 2. 克隆仓库
+
+```bash
+git clone https://github.com/CJackHwang/AIstudioProxyAPI.git
 cd AIstudioProxyAPI
 ```
 
-### 2. 创建并激活虚拟环境（推荐）
+### 3. 安装依赖
+
+Poetry 会自动创建虚拟环境并安装所有依赖：
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# venv\\Scripts\\activate  # Windows
+# 安装生产依赖
+poetry install
+
+# 安装包括开发依赖 (推荐开发者)
+poetry install --with dev
 ```
 
-*   说明: 第一行命令 `python -m venv venv` 会在当前目录下创建一个名为 `venv` 的子目录，里面包含了 Python 解释器和独立的包安装目录。第二行命令 `source venv/bin/activate` (macOS/Linux) 或 `venv\\Scripts\\activate` (Windows) 会激活这个环境，之后你的终端提示符可能会发生变化 (例如前面加上 `(venv)` )，表示你正处于虚拟环境中。后续的 `pip install` 命令会将库安装到这个 `venv` 目录内。
+**Poetry 优势**:
+- ✅ 自动创建和管理虚拟环境
+- ✅ 依赖解析和版本锁定 (`poetry.lock`)
+- ✅ 区分生产依赖和开发依赖
+- ✅ 语义化版本控制
 
-### 3. 安装 Camoufox 和依赖
+### 4. 激活虚拟环境
 
 ```bash
-# 安装 Camoufox 库 (推荐包含 geoip 数据，特别是使用代理时)
-pip install -U "camoufox[geoip]"
+# 激活 Poetry 创建的虚拟环境
+poetry env activate
 
-# 安装项目所需的其他 Python 库
-pip install -r requirements.txt
+# 或者在每个命令前加上 poetry run
+poetry run python --version
 ```
 
-**重要：关于引号使用的跨平台说明**
-
-在安装 `camoufox[geoip]` 时，不同平台需要使用不同的引号处理方式：
-
-**各平台推荐命令**：
-- **macOS/Linux (bash/zsh)**：`pip install -U "camoufox[geoip]"`
-- **Windows PowerShell**：`pip install -U "camoufox[geoip]"` 或 `pip install -U 'camoufox[geoip]'`
-- **Windows CMD**：`pip install -U camoufox[geoip]` （通常不需要引号）
-
-**技术原因**：
-- **Unix Shell (bash/zsh)**：方括号 `[geoip]` 会被解释为文件通配符（glob pattern），不使用引号会导致 `no matches found` 错误
-- **PowerShell**：虽然对方括号处理较为宽松，但使用引号是最安全的做法
-- **Windows CMD**：对方括号的处理相对简单，通常不需要引号，但使用引号也不会出错
-
-**最佳实践**：
-为了确保跨平台兼容性，**建议在所有平台都使用双引号**：`pip install -U "camoufox[geoip]"`
-
-**如果遇到问题**：
-- 如果出现 `no matches found` 或类似错误，请确保使用了引号
-- 如果引号导致问题，可以尝试不使用引号（主要在某些 Windows 环境中）
-`requirements.txt` 主要包含 `fastapi`, `uvicorn[standard]`, `playwright`, `pydantic` 等现代化依赖包。
-
-**依赖版本说明**:
-- **FastAPI**: 使用 0.115.12 版本，最新稳定版本，支持 Python 3.8+
-  - 包含新的参数模型功能和性能优化
-  - 改进的类型提示和 OpenAPI 文档生成
-  - 完全兼容 OpenAI API 标准
-- **Pydantic**: 使用 2.7.1+ 版本范围，提供强大的数据验证和类型安全
-- **Uvicorn**: 使用 0.29.0 版本，高性能 ASGI 服务器，支持异步处理
-- **Playwright**: 最新版本，用于浏览器自动化和页面交互
-- **Camoufox**: 反指纹检测浏览器，包含 geoip 数据，提供更好的隐蔽性
-- **WebSockets**: 12.0 版本，用于实时日志传输和状态监控
-- **aiohttp**: 3.9.5 版本，用于异步HTTP客户端操作
-
-### 4. 下载 Camoufox 浏览器
+### 5. 下载 Camoufox 浏览器
 
 ```bash
-# Camoufox 需要下载其修改版的 Firefox
+# 在 Poetry 环境中下载 Camoufox 浏览器
+poetry run camoufox fetch
+
+# 或在激活的环境中
 camoufox fetch
 ```
-如果此步骤因 SSL 证书等网络问题失败，可以尝试运行项目中的 [`fetch_camoufox_data.py`](../fetch_camoufox_data.py) 脚本 (详见[故障排除指南](troubleshooting.md))。
 
-### 5. 安装 Playwright 浏览器依赖（如果需要）
+**依赖版本说明** (由 Poetry 管理):
+- **FastAPI 0.115.12**: 最新稳定版本，包含性能优化和新功能
+  - 新增 Query/Header/Cookie 参数模型支持
+  - 改进的类型提示和验证
+  - 更好的 OpenAPI 文档生成
+- **Pydantic >=2.7.1,<3.0.0**: 现代数据验证库，版本范围确保兼容性
+- **Uvicorn 0.29.0**: 高性能 ASGI 服务器，支持异步处理
+- **Playwright**: 最新版本，用于浏览器自动化和页面交互
+- **Camoufox 0.4.11**: 反指纹检测浏览器，包含 geoip 数据
+- **WebSockets 12.0**: 用于实时日志传输和状态监控
+- **aiohttp ~3.9.5**: 异步HTTP客户端，允许补丁版本更新
 
-虽然 Camoufox 使用自己的 Firefox，但首次运行 Playwright 相关命令可能仍需要安装一些基础依赖。
+### 6. 安装 Playwright 浏览器依赖（可选）
+
+虽然 Camoufox 使用自己的 Firefox，但首次运行可能需要安装一些基础依赖：
 
 ```bash
-# 确保 Playwright 库能找到必要的系统依赖
+# 在 Poetry 环境中安装 Playwright 依赖
+poetry run playwright install-deps firefox
+
+# 或在激活的环境中
 playwright install-deps firefox
-# 或者 playwright install-deps # 安装所有浏览器的依赖
+```
+
+如果 `camoufox fetch` 因网络问题失败，可以尝试运行项目中的 [`fetch_camoufox_data.py`](../fetch_camoufox_data.py) 脚本 (详见[故障排除指南](troubleshooting.md))。
+
+## 🔍 验证安装
+
+### 检查 Poetry 环境
+
+```bash
+# 查看 Poetry 环境信息
+poetry env info
+
+# 查看已安装的依赖
+poetry show
+
+# 查看依赖树
+poetry show --tree
+
+# 检查 Python 版本
+poetry run python --version
+```
+
+### 检查关键组件
+
+```bash
+# 检查 Camoufox
+poetry run camoufox --version
+
+# 检查 FastAPI
+poetry run python -c "import fastapi; print(f'FastAPI: {fastapi.__version__}')"
+
+# 检查 Playwright
+poetry run python -c "import playwright; print('Playwright: OK')"
 ```
 
 ## 多平台指南
