@@ -15,7 +15,11 @@ from .model_management import (
     switch_ai_studio_model,
     load_excluded_models,
     _handle_initial_model_state_and_storage,
-    _set_model_from_page_display
+    _set_model_from_page_display,
+    _verify_ui_state_settings,
+    _force_ui_state_settings,
+    _force_ui_state_with_retry,
+    _verify_and_apply_ui_state
 )
 from .script_manager import ScriptManager, script_manager
 
@@ -40,6 +44,10 @@ __all__ = [
     'load_excluded_models',
     '_handle_initial_model_state_and_storage',
     '_set_model_from_page_display',
+    '_verify_ui_state_settings',
+    '_force_ui_state_settings',
+    '_force_ui_state_with_retry',
+    '_verify_and_apply_ui_state',
 
     # 脚本管理相关
     'ScriptManager',

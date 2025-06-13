@@ -331,22 +331,37 @@ else:
 
 ## 重要提示
 
-### 响应获取与参数控制
+### 三层响应获取机制与参数控制
 
-*   **响应获取优先级**: 项目现在采用多层响应获取机制：
-    1. **集成的流式代理服务 (Stream Proxy)**: 默认通过 [`launch_camoufox.py`](../launch_camoufox.py) 启动时启用，监听在端口 `3120` (可通过 `--stream-port` 修改或设为 `0` 禁用)。此服务直接处理请求，提供最佳性能。
-    2. **外部 Helper 服务**: 如果集成的流式代理被禁用，且通过 [`launch_camoufox.py`](../launch_camoufox.py) 的 `--helper <endpoint_url>` 参数提供了 Helper 服务端点，并且存在有效的认证文件 (`auth_profiles/active/*.json`，用于提取 `SAPISID` Cookie)，则会尝试使用此外部 Helper 服务。
-    3. **Playwright 页面交互**: 如果以上两种方法均未启用或失败，则回退到传统的 Playwright 方式，通过模拟浏览器操作（编辑/复制按钮）获取响应。
+*   **响应获取优先级**: 项目采用三层响应获取机制，确保高可用性和最佳性能：
+    1. **集成流式代理服务 (Stream Proxy)**:
+       - 默认启用，监听端口 `3120` (可通过 `.env` 文件的 `STREAM_PORT` 配置)
+       - 提供最佳性能和稳定性，直接处理AI Studio请求
+       - 支持基础参数传递，无需浏览器交互
+    2. **外部 Helper 服务**:
+       - 可选配置，通过 `--helper <endpoint_url>` 参数或 `.env` 配置启用
+       - 需要有效的认证文件 (`auth_profiles/active/*.json`) 提取 `SAPISID` Cookie
+       - 作为流式代理的备用方案
+    3. **Playwright 页面交互**:
+       - 最终后备方案，通过浏览器自动化获取响应
+       - 支持完整的参数控制和模型切换
+       - 通过模拟用户操作（编辑/复制按钮）获取响应
 
-*   API 请求中的 `model` 字段用于在 AI Studio 页面切换模型。请确保模型 ID 有效。
+*   **参数控制详解**:
+    - **流式代理模式**: 支持基础参数 (`model`, `temperature`, `max_tokens` 等)，性能最优
+    - **Helper服务模式**: 参数支持取决于外部Helper服务的具体实现
+    - **Playwright模式**: 完整支持所有参数，包括 `temperature`, `max_output_tokens`, `top_p`, `stop`, `reasoning_effort`, `tools` 等
 
-*   API 请求中的模型参数（如 `temperature`, `max_output_tokens`, `top_p`, `stop`）会被代理接收并尝试在 AI Studio 页面应用。这些参数的设置**仅在通过 Playwright 页面交互获取响应时生效**。当使用集成的流式代理或外部 Helper 服务时，这些参数的传递和应用方式取决于这些服务自身的实现，可能与 AI Studio 页面的设置不同步或不完全支持。
+*   **模型管理**:
+    - API 请求中的 `model` 字段用于在 AI Studio 页面切换模型
+    - 支持动态模型列表获取和模型ID验证
+    - [`excluded_models.txt`](../excluded_models.txt) 文件可排除特定模型ID
 
-*   Web UI 的"模型设置"面板的参数配置也主要影响通过 Playwright 页面交互获取响应的场景。
-
-*   项目根目录下的 [`excluded_models.txt`](../excluded_models.txt) 文件可用于从 `/v1/models` 端点返回的列表中排除特定的模型 ID。
-
-*   **🆕 脚本注入功能**: 通过启用脚本注入功能，可以动态添加自定义模型到模型列表中。详见 [脚本注入指南](script_injection_guide.md)。
+*   **🆕 脚本注入功能 v3.0**:
+    - 使用 Playwright 原生网络拦截，100% 可靠性
+    - 直接从油猴脚本解析模型数据，无需配置文件维护
+    - 前后端模型数据完全同步，注入模型标记为 `"injected": true`
+    - 详见 [脚本注入指南](script_injection_guide.md)
 
 ### 客户端管理历史
 
@@ -355,13 +370,18 @@ else:
 ## 兼容性说明
 
 ### Python 版本兼容性
-*   **推荐版本**: Python 3.10+ 或 3.11+
-*   **最低要求**: Python 3.9
+*   **推荐版本**: Python 3.10+ 或 3.11+ (生产环境推荐)
+*   **最低要求**: Python 3.9 (所有功能完全支持)
+*   **Docker环境**: Python 3.10 (容器内默认版本)
 *   **完全支持**: Python 3.9, 3.10, 3.11, 3.12, 3.13
-*   **依赖兼容**: 所有依赖包均支持推荐的Python版本范围
+*   **依赖管理**: 使用 Poetry 管理，确保版本一致性
 
 ### API 兼容性
-*   **OpenAI API**: 完全兼容 OpenAI v1 API 标准
+*   **OpenAI API**: 完全兼容 OpenAI v1 API 标准，支持所有主流客户端
+*   **FastAPI**: 基于 0.115.12 版本，包含最新性能优化和功能增强
+*   **HTTP 协议**: 支持 HTTP/1.1 和 HTTP/2，完整的异步处理
+*   **认证方式**: 支持 Bearer Token 和 X-API-Key 头部认证，OpenAI标准兼容
+*   **流式响应**: 完整支持 Server-Sent Events (SSE) 流式输出
 *   **FastAPI**: 基于 0.111.0 版本，支持现代异步特性
 *   **HTTP 协议**: 支持 HTTP/1.1 和 HTTP/2
 *   **认证方式**: 支持 Bearer Token 和 X-API-Key 头部认证

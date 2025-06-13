@@ -130,13 +130,32 @@ source venv/bin/activate  # Linux/macOS
 
 ### 代理配置问题
 
-*   **代理不生效**: 确保使用 `--internal-camoufox-proxy` 参数明确指定代理
-*   **代理冲突**: 使用 `--internal-camoufox-proxy ''` 可以明确禁用代理
+**推荐使用 .env 配置方式**:
+```env
+# 统一代理配置
+UNIFIED_PROXY_CONFIG=http://127.0.0.1:7890
+# 或禁用代理
+UNIFIED_PROXY_CONFIG=
+```
+
+**常见问题**:
+*   **代理不生效**: 确保在 `.env` 文件中设置 `UNIFIED_PROXY_CONFIG` 或使用 `--internal-camoufox-proxy` 参数
+*   **代理冲突**: 使用 `UNIFIED_PROXY_CONFIG=` 或 `--internal-camoufox-proxy ''` 明确禁用代理
 *   **代理连接失败**: 检查代理服务器是否可用，代理地址格式是否正确
 
-### 流式响应中断
+### 三层响应获取机制问题
 
-如果流式响应频繁中断或不完整，可以尝试通过 [`launch_camoufox.py --stream-port=0`](../launch_camoufox.py) 禁用集成的流式代理进行测试。
+**流式响应中断**:
+- 检查集成流式代理状态 (端口 3120)
+- 尝试禁用流式代理测试：在 `.env` 中设置 `STREAM_PORT=0`
+- 查看 `/health` 端点了解各层状态
+
+**响应获取失败**:
+1. **第一层失败**: 检查流式代理服务是否正常运行
+2. **第二层失败**: 验证 Helper 服务配置和认证文件
+3. **第三层失败**: 检查 Playwright 浏览器连接状态
+
+详细说明请参见 [流式处理模式详解](streaming-modes.md)。
 
 ### 自签名证书管理
 

@@ -8,7 +8,20 @@
 
 ## 方法一：通过命令行运行 Debug 模式
 
+**推荐使用 .env 配置方式**:
+```env
+# .env 文件配置
+DEFAULT_FASTAPI_PORT=2048
+STREAM_PORT=0
+LAUNCH_MODE=normal
+DEBUG_LOGS_ENABLED=true
+```
+
 ```bash
+# 简化启动命令 (推荐)
+python launch_camoufox.py --debug
+
+# 传统命令行方式 (仍然支持)
 python launch_camoufox.py --debug --server-port 2048 --stream-port 0 --helper '' --internal-camoufox-proxy ''
 ```
 

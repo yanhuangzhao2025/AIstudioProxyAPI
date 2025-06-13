@@ -56,23 +56,36 @@ python launch_camoufox.py --debug
 1. **`--internal-camoufox-proxy` 命令行参数** (最高优先级)
    - 明确指定代理：`--internal-camoufox-proxy 'http://127.0.0.1:7890'`
    - 明确禁用代理：`--internal-camoufox-proxy ''`
-2. **`HTTP_PROXY` 环境变量**
-3. **`HTTPS_PROXY` 环境变量**
-4. **系统代理设置** (Linux 下的 gsettings，最低优先级)
+2. **`UNIFIED_PROXY_CONFIG` 环境变量** (推荐，.env 文件配置)
+3. **`HTTP_PROXY` 环境变量**
+4. **`HTTPS_PROXY` 环境变量**
+5. **系统代理设置** (Linux 下的 gsettings，最低优先级)
+
+**推荐配置方式**:
+```env
+# .env 文件中统一配置代理
+UNIFIED_PROXY_CONFIG=http://127.0.0.1:7890
+# 或禁用代理
+UNIFIED_PROXY_CONFIG=
+```
 
 **重要说明**：此代理配置会同时应用于 Camoufox 浏览器和流式代理服务的上游连接，确保整个系统的代理行为一致。
 
-## 响应获取模式配置
+## 三层响应获取机制配置
+
+项目采用三层响应获取机制，确保高可用性和最佳性能。详细说明请参见 [流式处理模式详解](streaming-modes.md)。
 
 ### 模式1: 优先使用集成的流式代理 (默认推荐)
 
 **使用 `.env` 配置（推荐）:**
 
-```bash
+```env
 # 在 .env 文件中配置
 STREAM_PORT=3120
-# HTTP_PROXY=http://127.0.0.1:7890  # 如需代理，取消注释
+UNIFIED_PROXY_CONFIG=http://127.0.0.1:7890  # 如需代理
+```
 
+```bash
 # 然后简单启动
 python launch_camoufox.py --headless
 ```

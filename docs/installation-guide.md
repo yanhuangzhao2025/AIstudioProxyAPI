@@ -102,14 +102,15 @@ camoufox fetch
 **依赖版本说明** (由 Poetry 管理):
 - **FastAPI 0.115.12**: 最新稳定版本，包含性能优化和新功能
   - 新增 Query/Header/Cookie 参数模型支持
-  - 改进的类型提示和验证
-  - 更好的 OpenAPI 文档生成
+  - 改进的类型提示和验证机制
+  - 更好的 OpenAPI 文档生成和异步性能
 - **Pydantic >=2.7.1,<3.0.0**: 现代数据验证库，版本范围确保兼容性
-- **Uvicorn 0.29.0**: 高性能 ASGI 服务器，支持异步处理
-- **Playwright**: 最新版本，用于浏览器自动化和页面交互
-- **Camoufox 0.4.11**: 反指纹检测浏览器，包含 geoip 数据
-- **WebSockets 12.0**: 用于实时日志传输和状态监控
-- **aiohttp ~3.9.5**: 异步HTTP客户端，允许补丁版本更新
+- **Uvicorn 0.29.0**: 高性能 ASGI 服务器，支持异步处理和HTTP/2
+- **Playwright**: 最新版本，用于浏览器自动化、页面交互和网络拦截
+- **Camoufox 0.4.11**: 反指纹检测浏览器，包含 geoip 数据和增强隐蔽性
+- **WebSockets 12.0**: 用于实时日志传输、状态监控和Web UI通信
+- **aiohttp ~3.9.5**: 异步HTTP客户端，支持代理和流式处理
+- **python-dotenv 1.0.1**: 环境变量管理，支持 .env 文件配置
 
 ### 6. 安装 Playwright 浏览器依赖（可选）
 

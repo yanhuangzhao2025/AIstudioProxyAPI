@@ -220,10 +220,11 @@ AUTO_CONFIRM_LOGIN=true
 AUTO_SAVE_AUTH=false
 AUTH_SAVE_TIMEOUT=30
 
-# 脚本注入配置 (v3.0)
+# 脚本注入配置 v3.0 (重大升级)
 ENABLE_SCRIPT_INJECTION=true
 USERSCRIPT_PATH=browser_utils/more_modles.js
 # 注意：MODEL_CONFIG_PATH 已废弃，现在直接从油猴脚本解析模型数据
+# v3.0 使用 Playwright 原生网络拦截，100% 可靠
 
 # API 默认参数
 DEFAULT_TEMPERATURE=1.0
@@ -340,13 +341,14 @@ docker run -d \
 
 ### 概述
 
-Docker 环境完全支持最新的脚本注入功能 v3.0，提供以下特性：
+Docker 环境完全支持最新的脚本注入功能 v3.0，提供革命性的改进：
 
-- **🚀 Playwright 原生拦截**: 使用 Playwright 路由拦截，100% 可靠
+- **🚀 Playwright 原生拦截**: 使用 Playwright 路由拦截，100% 可靠性
 - **🔄 双重保障机制**: 网络拦截 + 脚本注入，确保万无一失
-- **📝 直接脚本解析**: 从油猴脚本中自动解析模型列表
-- **🔗 前后端同步**: 前端和后端使用相同的模型数据源
-- **⚙️ 零配置维护**: 无需手动维护模型配置文件
+- **📝 直接脚本解析**: 从油猴脚本中自动解析模型列表，无需配置文件
+- **🔗 前后端同步**: 前端和后端使用相同的模型数据源，100%一致
+- **⚙️ 零配置维护**: 无需手动维护模型配置文件，脚本更新自动生效
+- **🔄 自动适配**: 油猴脚本更新时无需手动更新配置
 
 ### 配置选项
 

@@ -11,9 +11,18 @@
 1. **`--internal-camoufox-proxy` 命令行参数** (最高优先级)
    - 明确指定代理：`--internal-camoufox-proxy 'http://127.0.0.1:7890'`
    - 明确禁用代理：`--internal-camoufox-proxy ''`
-2. **`HTTP_PROXY` 环境变量**
-3. **`HTTPS_PROXY` 环境变量**
-4. **系统代理设置** (Linux 下的 gsettings，最低优先级)
+2. **`UNIFIED_PROXY_CONFIG` 环境变量** (推荐，.env 文件配置)
+3. **`HTTP_PROXY` 环境变量**
+4. **`HTTPS_PROXY` 环境变量**
+5. **系统代理设置** (Linux 下的 gsettings，最低优先级)
+
+**推荐配置方式**:
+```env
+# .env 文件中统一配置代理
+UNIFIED_PROXY_CONFIG=http://127.0.0.1:7890
+# 或禁用代理
+UNIFIED_PROXY_CONFIG=
+```
 
 ### 统一代理配置
 
@@ -23,12 +32,21 @@
 
 ### 模式1: 优先使用集成的流式代理 (默认推荐)
 
-```bash
-# 基本启动命令 - FastAPI 在 2048, 集成流式代理在 3120, 明确禁用代理
-python launch_camoufox.py --headless --server-port 2048 --stream-port 3120 --helper '' --internal-camoufox-proxy ''
+**推荐使用 .env 配置方式**:
+```env
+# .env 文件配置
+DEFAULT_FASTAPI_PORT=2048
+STREAM_PORT=3120
+UNIFIED_PROXY_CONFIG=
+```
 
-# 使用自定义流式代理端口，明确禁用代理
-python launch_camoufox.py --headless --server-port 2048 --stream-port 3125 --helper '' --internal-camoufox-proxy ''
+```bash
+# 简化启动命令 (推荐)
+python launch_camoufox.py --headless
+
+# 传统命令行方式 (仍然支持)
+python launch_camoufox.py --headless --server-port 2048 --stream-port 3120 --helper '' --internal-camoufox-proxy ''
+```
 
 # 启用统一代理配置（同时应用于浏览器和流式代理）
 python launch_camoufox.py --headless --server-port 2048 --stream-port 3120 --helper '' --internal-camoufox-proxy 'http://127.0.0.1:7890'
