@@ -19,7 +19,7 @@ from config import (
 from config import (
     CLICK_TIMEOUT_MS, WAIT_FOR_ELEMENT_TIMEOUT_MS, CLEAR_CHAT_VERIFY_TIMEOUT_MS,
     DEFAULT_TEMPERATURE, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_STOP_SEQUENCES, DEFAULT_TOP_P,
-    ENABLE_URL_CONTEXT
+    ENABLE_URL_CONTEXT, ENABLE_THINKING_BUDGET, DEFAULT_THINKING_BUDGET, ENABLE_GOOGLE_SEARCH
 )
 from models import ClientDisconnectedError
 from .operations import save_error_snapshot, _wait_for_response_completion, _get_final_response_content
@@ -68,34 +68,65 @@ class PageController:
         else:
             self.logger.info(f"[{self.req_id}] URL Context 功能已禁用，跳过调整。")
 
-        # 调整“思考预算”开关
-        await self._set_thinking_budget_toggle_checked(check_client_disconnected)
-
-        # 在函数末尾，await self._set_thinking_budget_toggle_checked(...) 之后添加:
-        self.logger.info(f"[{self.req_id}] 检查预算...{request_params.get('reasoning_effort')}")
-        if 'reasoning_effort' in request_params:
-            await self._adjust_thinking_budget(request_params.get('reasoning_effort'), check_client_disconnected)
+        # 调整“思考预算”
+        await self._handle_thinking_budget(request_params, check_client_disconnected)
 
         # 调整 Google Search 开关
         await self._adjust_google_search(request_params, check_client_disconnected)
 
-    async def _adjust_thinking_budget(self, reasoning_effort: Optional[str], check_client_disconnected: Callable):
-        """根据 reasoning_effort 调整思考预算。"""
-        self.logger.info(f"[{self.req_id}] 检查并调整思考预算...")
-        
-        token_budget = None
-        if reasoning_effort is None or reasoning_effort.lower() == 'none':
-            token_budget = 8192
-            self.logger.info(f"[{self.req_id}] 'reasoning_effort' 为空或 'none'，使用默认思考预算: {token_budget}")
+    async def _handle_thinking_budget(self, request_params: Dict[str, Any], check_client_disconnected: Callable):
+        """处理思考预算的调整逻辑。"""
+        reasoning_effort = request_params.get('reasoning_effort')
+        if reasoning_effort is not None:
+            # 用户指定了，则开启并设置
+            self.logger.info(f"[{self.req_id}] 用户指定了 reasoning_effort: {reasoning_effort}。")
+            await self._control_thinking_budget_toggle(should_be_checked=True, check_client_disconnected=check_client_disconnected)
+            await self._adjust_thinking_budget(reasoning_effort, check_client_disconnected)
         else:
-            effort_map = {
-                "low": 1000,
-                "medium": 8000,
-                "high": 24000
-            }
-            token_budget = effort_map.get(reasoning_effort.lower())
+            # 用户未指定，根据默认配置
+            self.logger.info(f"[{self.req_id}] 用户未指定 reasoning_effort，根据默认配置 ENABLE_THINKING_BUDGET: {ENABLE_THINKING_BUDGET}。")
+            await self._control_thinking_budget_toggle(should_be_checked=ENABLE_THINKING_BUDGET, check_client_disconnected=check_client_disconnected)
+            if ENABLE_THINKING_BUDGET:
+                # 如果默认开启，则使用默认值
+                await self._adjust_thinking_budget(None, check_client_disconnected)
 
-        if not token_budget:
+    def _parse_thinking_budget(self, reasoning_effort: Optional[Any]) -> Optional[int]:
+        """从 reasoning_effort 解析出 token_budget。"""
+        token_budget = None
+        if reasoning_effort is None:
+            token_budget = DEFAULT_THINKING_BUDGET
+            self.logger.info(f"[{self.req_id}] 'reasoning_effort' 为空，使用默认思考预算: {token_budget}")
+        elif isinstance(reasoning_effort, int):
+            token_budget = reasoning_effort
+        elif isinstance(reasoning_effort, str):
+            if reasoning_effort.lower() == 'none':
+                token_budget = DEFAULT_THINKING_BUDGET
+                self.logger.info(f"[{self.req_id}] 'reasoning_effort' 为 'none' 字符串，使用默认思考预算: {token_budget}")
+            else:
+                effort_map = {
+                    "low": 1000,
+                    "medium": 8000,
+                    "high": 24000
+                }
+                token_budget = effort_map.get(reasoning_effort.lower())
+                if token_budget is None:
+                    try:
+                        token_budget = int(reasoning_effort)
+                    except (ValueError, TypeError):
+                        pass # token_budget remains None
+        
+        if token_budget is None:
+             self.logger.warning(f"[{self.req_id}] 无法从 '{reasoning_effort}' (类型: {type(reasoning_effort)}) 解析出有效的 token_budget。")
+
+        return token_budget
+
+    async def _adjust_thinking_budget(self, reasoning_effort: Optional[Any], check_client_disconnected: Callable):
+        """根据 reasoning_effort 调整思考预算。"""
+        self.logger.info(f"[{self.req_id}] 检查并调整思考预算，输入值: {reasoning_effort}")
+        
+        token_budget = self._parse_thinking_budget(reasoning_effort)
+
+        if token_budget is None:
             self.logger.warning(f"[{self.req_id}] 无效的 reasoning_effort 值: '{reasoning_effort}'。跳过调整。")
             return
 
@@ -122,18 +153,32 @@ class PageController:
             if isinstance(e, ClientDisconnectedError):
                 raise
 
+    def _should_enable_google_search(self, request_params: Dict[str, Any]) -> bool:
+        """根据请求参数或默认配置决定是否应启用 Google Search。"""
+        if 'tools' in request_params and request_params.get('tools') is not None:
+            tools = request_params.get('tools')
+            has_google_search_tool = False
+            if isinstance(tools, list):
+                for tool in tools:
+                    if isinstance(tool, dict):
+                        if tool.get('google_search_retrieval') is not None:
+                            has_google_search_tool = True
+                            break
+                        if tool.get('function', {}).get('name') == 'googleSearch':
+                            has_google_search_tool = True
+                            break
+            self.logger.info(f"[{self.req_id}] 请求中包含 'tools' 参数。检测到 Google Search 工具: {has_google_search_tool}。")
+            return has_google_search_tool
+        else:
+            self.logger.info(f"[{self.req_id}] 请求中不包含 'tools' 参数。使用默认配置 ENABLE_GOOGLE_SEARCH: {ENABLE_GOOGLE_SEARCH}。")
+            return ENABLE_GOOGLE_SEARCH
+
     async def _adjust_google_search(self, request_params: Dict[str, Any], check_client_disconnected: Callable):
-        """根据请求参数中的 'googleSearch' 工具存在与否，双向控制 Google Search 开关。"""
+        """根据请求参数或默认配置，双向控制 Google Search 开关。"""
         self.logger.info(f"[{self.req_id}] 检查并调整 Google Search 开关...")
 
-        tools = request_params.get('tools')
-        has_google_search = False
-        if isinstance(tools, list):
-            for tool in tools:
-                if isinstance(tool, dict) and tool.get('function', {}).get('name') == 'googleSearch':
-                    has_google_search = True
-                    break
-        
+        should_enable_search = self._should_enable_google_search(request_params)
+
         toggle_selector = GROUNDING_WITH_GOOGLE_SEARCH_TOGGLE_SELECTOR
         
         try:
@@ -142,39 +187,25 @@ class PageController:
             await self._check_disconnect(check_client_disconnected, "Google Search 开关 - 元素可见后")
 
             is_checked_str = await toggle_locator.get_attribute("aria-checked")
-            self.logger.info(f"[{self.req_id}] Google Search 开关 'aria-checked' 状态: '{is_checked_str}'。是否需要搜索: {has_google_search}")
+            is_currently_checked = is_checked_str == "true"
+            self.logger.info(f"[{self.req_id}] Google Search 开关当前状态: '{is_checked_str}'。期望状态: {should_enable_search}")
 
-            if has_google_search:
-                # 需要搜索，但开关是关闭的，则打开它
-                if is_checked_str == "false":
-                    self.logger.info(f"[{self.req_id}] 'googleSearch' 工具存在，但开关关闭。正在点击以打开...")
-                    await toggle_locator.click(timeout=CLICK_TIMEOUT_MS)
-                    await self._check_disconnect(check_client_disconnected, "Google Search 开关 - 点击打开后")
-                    await asyncio.sleep(0.5) # 等待UI更新
-                    new_state = await toggle_locator.get_attribute("aria-checked")
-                    if new_state == "true":
-                        self.logger.info(f"[{self.req_id}] ✅ Google Search 开关已成功打开。")
-                    else:
-                        self.logger.warning(f"[{self.req_id}] ⚠️ Google Search 开关打开失败。当前状态: '{new_state}'")
+            if should_enable_search != is_currently_checked:
+                action = "打开" if should_enable_search else "关闭"
+                self.logger.info(f"[{self.req_id}] Google Search 开关状态与期望不符。正在点击以{action}...")
+                await toggle_locator.click(timeout=CLICK_TIMEOUT_MS)
+                await self._check_disconnect(check_client_disconnected, f"Google Search 开关 - 点击{action}后")
+                await asyncio.sleep(0.5) # 等待UI更新
+                new_state = await toggle_locator.get_attribute("aria-checked")
+                if (new_state == "true") == should_enable_search:
+                    self.logger.info(f"[{self.req_id}] ✅ Google Search 开关已成功{action}。")
                 else:
-                    self.logger.info(f"[{self.req_id}] 'googleSearch' 工具存在，且开关已打开，无需操作。")
+                    self.logger.warning(f"[{self.req_id}] ⚠️ Google Search 开关{action}失败。当前状态: '{new_state}'")
             else:
-                # 不需要搜索，但开关是打开的，则关闭它
-                if is_checked_str == "true":
-                    self.logger.info(f"[{self.req_id}] 'googleSearch' 工具不存在，但开关打开。正在点击以关闭...")
-                    await toggle_locator.click(timeout=CLICK_TIMEOUT_MS)
-                    await self._check_disconnect(check_client_disconnected, "Google Search 开关 - 点击关闭后")
-                    await asyncio.sleep(0.5) # 等待UI更新
-                    new_state = await toggle_locator.get_attribute("aria-checked")
-                    if new_state == "false":
-                        self.logger.info(f"[{self.req_id}] ✅ Google Search 开关已成功关闭。")
-                    else:
-                        self.logger.warning(f"[{self.req_id}] ⚠️ Google Search 开关关闭失败。当前状态: '{new_state}'")
-                else:
-                    self.logger.info(f"[{self.req_id}] 'googleSearch' 工具不存在，且开关已关闭，无需操作。")
+                self.logger.info(f"[{self.req_id}] Google Search 开关已处于期望状态，无需操作。")
 
         except Exception as e:
-            self.logger.error(f"[{self.req_id}] ❌ 操作 'Google Search toggle' 开关 '{toggle_selector}' 时发生错误: {e}")
+            self.logger.error(f"[{self.req_id}] ❌ 操作 'Google Search toggle' 开关时发生错误: {e}")
             if isinstance(e, ClientDisconnectedError):
                  raise
 
@@ -200,53 +231,43 @@ class PageController:
         except Exception as e:
             self.logger.error(f"[{self.req_id}] ❌ 操作USE_URL_CONTEXT_SELECTOR时发生错误:{e}。")
 
-    async def _set_thinking_budget_toggle_checked(self, check_client_disconnected: Callable):
+    async def _control_thinking_budget_toggle(self, should_be_checked: bool, check_client_disconnected: Callable):
         """
-        确保 "Thinking Budget" 滑块开关处于选中状态。
+        根据 should_be_checked 的值，控制 "Thinking Budget" 滑块开关的状态。
         """
         toggle_selector = SET_THINKING_BUDGET_TOGGLE_SELECTOR
-        self.logger.info(f"[{self.req_id}] 检查并设置 'Thinking Budget toggle' 滑块开关 '{toggle_selector}' 的状态...")
+        self.logger.info(f"[{self.req_id}] 控制 'Thinking Budget' 开关，期望状态: {'选中' if should_be_checked else '未选中'}...")
 
         try:
             toggle_locator = self.page.locator(toggle_selector)
-            
-            # 等待元素在 DOM 中可见
             await expect_async(toggle_locator).to_be_visible(timeout=5000)
             await self._check_disconnect(check_client_disconnected, "思考预算开关 - 元素可见后")
 
-            # 1. 检查当前 'aria-checked' 属性
-            is_checked = await toggle_locator.get_attribute("aria-checked")
-            self.logger.info(f"[{self.req_id}] 思考预算开关当前 'aria-checked' 状态: {is_checked}")
+            is_checked_str = await toggle_locator.get_attribute("aria-checked")
+            current_state_is_checked = is_checked_str == "true"
+            self.logger.info(f"[{self.req_id}] 思考预算开关当前 'aria-checked' 状态: {is_checked_str} (当前是否选中: {current_state_is_checked})")
 
-            # 2. 如果开关未选中 (aria-checked="false")，则点击它
-            if is_checked == "false":
-                self.logger.info(f"[{self.req_id}] 思考预算开关当前未选中，正在点击以启用...")
+            if current_state_is_checked != should_be_checked:
+                action = "启用" if should_be_checked else "禁用"
+                self.logger.info(f"[{self.req_id}] 思考预算开关当前状态与期望不符，正在点击以{action}...")
                 await toggle_locator.click(timeout=CLICK_TIMEOUT_MS)
-                await self._check_disconnect(check_client_disconnected, "思考预算开关 - 点击后")
-                
-                # 3. 验证操作是否成功
-                await asyncio.sleep(0.5)  # 短暂等待，让 UI 状态更新
-                new_state = await toggle_locator.get_attribute("aria-checked")
-                if new_state == "true":
-                    self.logger.info(f"[{self.req_id}] ✅ 'Thinking Budget toggle' 已成功启用。新状态: {new_state}")
-                else:
-                    self.logger.warning(f"[{self.req_id}] ⚠️ 'Thinking Budget toggle' 点击后验证失败。期望状态: 'true', 实际状态: '{new_state}'")
-                    # 如果需要，可以在此处添加错误快照
-                    # await save_error_snapshot(f"thinking_budget_toggle_verify_fail_{self.req_id}")
+                await self._check_disconnect(check_client_disconnected, f"思考预算开关 - 点击{action}后")
 
-            elif is_checked == "true":
-                self.logger.info(f"[{self.req_id}] 'Thinking Budget toggle' 已处于选中状态，无需操作。")
+                await asyncio.sleep(0.5)
+                new_state_str = await toggle_locator.get_attribute("aria-checked")
+                new_state_is_checked = new_state_str == "true"
+
+                if new_state_is_checked == should_be_checked:
+                    self.logger.info(f"[{self.req_id}] ✅ 'Thinking Budget' 开关已成功{action}。新状态: {new_state_str}")
+                else:
+                    self.logger.warning(f"[{self.req_id}] ⚠️ 'Thinking Budget' 开关{action}后验证失败。期望状态: '{should_be_checked}', 实际状态: '{new_state_str}'")
             else:
-                # 处理 'aria-checked' 属性不存在或值无效的情况
-                self.logger.warning(f"[{self.req_id}] 无法确定 'Thinking Budget toggle' 的状态，'aria-checked' 值为: '{is_checked}'。")
+                self.logger.info(f"[{self.req_id}] 'Thinking Budget' 开关已处于期望状态，无需操作。")
 
         except Exception as e:
-            self.logger.error(f"[{self.req_id}] ❌ 操作 'Thinking Budget toggle' 滑块开关 '{toggle_selector}' 时发生错误: {e}")
-            # 如果需要，可以在此处添加错误快照
-            # await save_error_snapshot(f"thinking_budget_toggle_error_{self.req_id}")
-            # 如果是客户端断开连接的特定错误，则重新抛出
+            self.logger.error(f"[{self.req_id}] ❌ 操作 'Thinking Budget toggle' 开关时发生错误: {e}")
             if isinstance(e, ClientDisconnectedError):
-                 raise
+                raise
     async def _adjust_temperature(self, temperature: float, page_params_cache: dict, params_cache_lock: asyncio.Lock, check_client_disconnected: Callable):
         """调整温度参数。"""
         async with params_cache_lock:
