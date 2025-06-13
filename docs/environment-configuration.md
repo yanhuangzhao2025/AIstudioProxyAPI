@@ -139,6 +139,22 @@ DEFAULT_TOP_P=0.95
 
 # 默认停止序列 (JSON 数组格式)
 DEFAULT_STOP_SEQUENCES=["用户:"]
+
+# 是否在处理请求时自动打开并使用 "URL Context" 功能
+# 参考: https://ai.google.dev/gemini-api/docs/url-context
+ENABLE_URL_CONTEXT=true
+
+# 是否默认启用 "指定思考预算" 功能 (true/false),不启用时模型一般将自行决定思考预算
+# 当 API 请求中未提供 reasoning_effort 参数时,将使用此值。
+ENABLE_THINKING_BUDGET=false
+
+# "指定思考预算量" 的默认值 (token)
+# 当 API 请求中未提供 reasoning_effort 参数时,将使用此值。
+DEFAULT_THINKING_BUDGET=8192
+
+# 是否默认启用 "Google Search" 功能 (true/false)
+# 当 API 请求中未提供 tools 参数时，将使用此设置作为 Google Search 的默认开关状态。
+ENABLE_GOOGLE_SEARCH=false
 ```
 
 ### 超时配置
@@ -168,7 +184,7 @@ GUI_DEFAULT_STREAM_PORT=3120
 GUI_DEFAULT_HELPER_ENDPOINT=
 ```
 
-### 脚本注入配置 🆕
+### 脚本注入配置 v3.0 🆕
 
 ```env
 # 是否启用油猴脚本注入功能
@@ -179,11 +195,18 @@ ENABLE_SCRIPT_INJECTION=true
 USERSCRIPT_PATH=browser_utils/more_modles.js
 ```
 
-**脚本注入功能说明**：
-- 支持动态挂载油猴脚本来增强 AI Studio 的模型列表
-- 使用 Playwright 原生网络拦截，确保 100% 可靠性
-- 直接从油猴脚本解析模型数据，与前端显示效果100%一致
-- 脚本文件不存在时会静默跳过，不影响主要功能
+**脚本注入功能 v3.0 重大升级**：
+- **🚀 Playwright 原生拦截**: 使用 Playwright 路由拦截，100% 可靠性
+- **🔄 双重保障机制**: 网络拦截 + 脚本注入，确保万无一失
+- **📝 直接脚本解析**: 从油猴脚本中自动解析模型列表，无需配置文件
+- **🔗 前后端同步**: 前端和后端使用相同的模型数据源
+- **⚙️ 零配置维护**: 脚本更新时自动获取新的模型列表
+- **🔄 自动适配**: 油猴脚本更新时无需手动更新配置
+
+**与 v1.x 的主要区别**：
+- 移除了 `MODEL_CONFIG_PATH` 配置项（已废弃）
+- 不再需要手动维护模型配置文件
+- 工作机制从"配置文件 + 脚本注入"改为"直接脚本解析 + 网络拦截"
 
 详细使用方法请参见 [脚本注入指南](script_injection_guide.md)。
 
@@ -240,10 +263,10 @@ DEFAULT_CAMOUFOX_PORT=9223
 STREAM_PORT=3121
 ```
 
-### 场景 5：启用脚本注入 🆕
+### 场景 5：启用脚本注入 v3.0 🆕
 
 ```env
-# 启用脚本注入功能
+# 启用脚本注入功能 v3.0
 ENABLE_SCRIPT_INJECTION=true
 
 # 使用自定义脚本（模型数据直接从脚本解析）
@@ -251,7 +274,15 @@ USERSCRIPT_PATH=browser_utils/my_custom_script.js
 
 # 调试模式查看注入效果
 DEBUG_LOGS_ENABLED=true
+
+# 流式代理配置（与脚本注入配合使用）
+STREAM_PORT=3120
 ```
+
+**v3.0 脚本注入优势**：
+- 使用 Playwright 原生网络拦截，无时序问题
+- 前后端模型数据100%同步
+- 零配置维护，脚本更新自动生效
 
 ## 配置优先级
 
