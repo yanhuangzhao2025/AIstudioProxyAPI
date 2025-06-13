@@ -139,6 +139,22 @@ DEFAULT_TOP_P=0.95
 
 # 默认停止序列 (JSON 数组格式)
 DEFAULT_STOP_SEQUENCES=["用户:"]
+
+# 是否在处理请求时自动打开并使用 "URL Context" 功能
+# 参考: https://ai.google.dev/gemini-api/docs/url-context
+ENABLE_URL_CONTEXT=true
+
+# 是否默认启用 "指定思考预算" 功能 (true/false),不启用时模型一般将自行决定思考预算
+# 当 API 请求中未提供 reasoning_effort 参数时,将使用此值。
+ENABLE_THINKING_BUDGET=false
+
+# "指定思考预算量" 的默认值 (token)
+# 当 API 请求中未提供 reasoning_effort 参数时,将使用此值。
+DEFAULT_THINKING_BUDGET=8192
+
+# 是否默认启用 "Google Search" 功能 (true/false)
+# 当 API 请求中未提供 tools 参数时，将使用此设置作为 Google Search 的默认开关状态。
+ENABLE_GOOGLE_SEARCH=false
 ```
 
 ### 超时配置
