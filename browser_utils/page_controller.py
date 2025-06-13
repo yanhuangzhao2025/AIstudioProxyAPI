@@ -18,7 +18,8 @@ from config import (
 )
 from config import (
     CLICK_TIMEOUT_MS, WAIT_FOR_ELEMENT_TIMEOUT_MS, CLEAR_CHAT_VERIFY_TIMEOUT_MS,
-    DEFAULT_TEMPERATURE, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_STOP_SEQUENCES, DEFAULT_TOP_P
+    DEFAULT_TEMPERATURE, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_STOP_SEQUENCES, DEFAULT_TOP_P,
+    ENABLE_URL_CONTEXT
 )
 from models import ClientDisconnectedError
 from .operations import save_error_snapshot, _wait_for_response_completion, _get_final_response_content
@@ -62,7 +63,10 @@ class PageController:
         await self._check_disconnect(check_client_disconnected, "End Parameter Adjustment")
 
         # 调整URL CONTEXT
-        await self._open_url_content(check_client_disconnected)
+        if ENABLE_URL_CONTEXT:
+            await self._open_url_content(check_client_disconnected)
+        else:
+            self.logger.info(f"[{self.req_id}] URL Context 功能已禁用，跳过调整。")
 
         # 调整“思考预算”开关
         await self._set_thinking_budget_toggle_checked(check_client_disconnected)

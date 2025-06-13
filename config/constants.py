@@ -19,6 +19,8 @@ DEFAULT_FALLBACK_MODEL_ID = os.environ.get('DEFAULT_FALLBACK_MODEL_ID', "no mode
 DEFAULT_TEMPERATURE = float(os.environ.get('DEFAULT_TEMPERATURE', '1.0'))
 DEFAULT_MAX_OUTPUT_TOKENS = int(os.environ.get('DEFAULT_MAX_OUTPUT_TOKENS', '65536'))
 DEFAULT_TOP_P = float(os.environ.get('DEFAULT_TOP_P', '0.95'))
+# --- 默认功能开关 ---
+ENABLE_URL_CONTEXT = os.environ.get('ENABLE_URL_CONTEXT', 'true').lower() in ('true', '1', 'yes')
 
 # 默认停止序列 - 支持 JSON 格式配置
 try:
