@@ -149,8 +149,12 @@ def cleanup():
                     logger.info(f"  Camoufox 进程组 (PID: {pid}) 未找到，尝试直接终止进程...")
                     camoufox_proc.terminate()
             else:
-                logger.info(f"  向 Camoufox (PID: {pid}) 发送 SIGTERM 信号...")
-                camoufox_proc.terminate()
+                if sys.platform == "win32":
+                    logger.info(f"进程树 (PID: {pid}) 发送终止请求")
+                    subprocess.call(['taskkill', '/T', '/PID', str(pid)])
+                else:
+                    logger.info(f"  向 Camoufox (PID: {pid}) 发送 SIGTERM 信号...")
+                    camoufox_proc.terminate()
             camoufox_proc.wait(timeout=5)
             logger.info(f"  ✓ Camoufox (PID: {pid}) 已通过 SIGTERM 成功终止。")
         except subprocess.TimeoutExpired:
@@ -164,7 +168,11 @@ def cleanup():
                     logger.info(f"  Camoufox 进程组 (PID: {pid}) 在 SIGKILL 时未找到，尝试直接强制终止...")
                     camoufox_proc.kill()
             else:
-                camoufox_proc.kill()
+                if sys.platform == "win32":
+                    logger.info(f"  强制杀死 Camoufox 进程树 (PID: {pid})")
+                    subprocess.call(['taskkill', '/F', '/T', '/PID', str(pid)])
+                else:
+                    camoufox_proc.kill()
             try:
                 camoufox_proc.wait(timeout=2)
                 logger.info(f"  ✓ Camoufox (PID: {pid}) 已通过 SIGKILL 成功终止。")
