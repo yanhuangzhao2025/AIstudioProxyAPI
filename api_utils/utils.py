@@ -250,7 +250,8 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
     combined_parts = []
     system_prompt_content: Optional[str] = None
     processed_system_message_indices = set()
-    
+    images_list = []  # 将 image_list 的初始化移到循环外部
+
     # 处理系统消息
     for i, msg in enumerate(messages):
         if msg.role == 'system':
@@ -284,7 +285,6 @@ def prepare_combined_prompt(messages: List[Message], req_id: str) -> str:
         role = msg.role or 'unknown'
         role_prefix_ui = f"{role_map_ui.get(role, role.capitalize())}:\n"
         current_turn_parts = [role_prefix_ui]
-        images_list = []
         
         content = msg.content or ''
         content_str = ""
