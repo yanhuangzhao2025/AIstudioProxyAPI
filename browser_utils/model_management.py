@@ -51,7 +51,7 @@ async def _verify_ui_state_settings(page: AsyncPage, req_id: str = "unknown") ->
             are_tools_open = prefs.get('areToolsOpen')
 
             # 检查是否需要更新
-            needs_update = (is_advanced_open is not True) or (are_tools_open is not False)
+            needs_update = (is_advanced_open is not True) or (are_tools_open is not True)
 
             result = {
                 'exists': True,
@@ -61,7 +61,7 @@ async def _verify_ui_state_settings(page: AsyncPage, req_id: str = "unknown") ->
                 'prefs': prefs
             }
 
-            logger.info(f"[{req_id}] UI状态验证结果: isAdvancedOpen={is_advanced_open}, areToolsOpen={are_tools_open}, needsUpdate={needs_update}")
+            logger.info(f"[{req_id}] UI状态验证结果: isAdvancedOpen={is_advanced_open}, areToolsOpen={are_tools_open} (期望: True), needsUpdate={needs_update}")
             return result
 
         except json.JSONDecodeError as e:
@@ -110,13 +110,13 @@ async def _force_ui_state_settings(page: AsyncPage, req_id: str = "unknown") -> 
 
         # 强制设置关键配置
         prefs['isAdvancedOpen'] = True
-        prefs['areToolsOpen'] = False
+        prefs['areToolsOpen'] = True
 
         # 保存到localStorage
         prefs_str = json.dumps(prefs)
         await page.evaluate("(prefsStr) => localStorage.setItem('aiStudioUserPreference', prefsStr)", prefs_str)
 
-        logger.info(f"[{req_id}] 已强制设置: isAdvancedOpen=true, areToolsOpen=false")
+        logger.info(f"[{req_id}] 已强制设置: isAdvancedOpen=true, areToolsOpen=true")
 
         # 验证设置是否成功
         verify_state = await _verify_ui_state_settings(page, req_id)
@@ -231,7 +231,7 @@ async def switch_ai_studio_model(page: AsyncPage, model_id: str, req_id: str) ->
 
         # 为了保持兼容性，也更新当前的prefs对象
         current_prefs_for_modification["isAdvancedOpen"] = True
-        current_prefs_for_modification["areToolsOpen"] = False
+        current_prefs_for_modification["areToolsOpen"] = True
         await page.evaluate("(prefsStr) => localStorage.setItem('aiStudioUserPreference', prefsStr)", json.dumps(current_prefs_for_modification))
 
         logger.info(f"[{req_id}] localStorage 已更新，导航到 '{new_chat_url}' 应用新模型...")
@@ -362,7 +362,7 @@ async def switch_ai_studio_model(page: AsyncPage, model_id: str, req_id: str) ->
 
             # 为了保持兼容性，也更新当前的prefs对象
             base_prefs_for_final_revert["isAdvancedOpen"] = True
-            base_prefs_for_final_revert["areToolsOpen"] = False
+            base_prefs_for_final_revert["areToolsOpen"] = True
             logger.info(f"[{req_id}] 恢复：准备将 localStorage.promptModel 设置回页面实际显示的模型的路径: '{path_to_revert_to}'，并强制设置配置选项")
             await page.evaluate("(prefsStr) => localStorage.setItem('aiStudioUserPreference', prefsStr)", json.dumps(base_prefs_for_final_revert))
             logger.info(f"[{req_id}] 恢复：导航到 '{new_chat_url}' 以应用恢复到 '{model_id_to_revert_to}' 的 localStorage 设置...")
@@ -463,7 +463,7 @@ async def _handle_initial_model_state_and_storage(page: AsyncPage):
                     ui_state = await _verify_ui_state_settings(page, "initial")
                     if ui_state['needsUpdate']:
                         needs_reload_and_storage_update = True
-                        reason_for_reload = f"UI状态需要更新: isAdvancedOpen={ui_state['isAdvancedOpen']}, areToolsOpen={ui_state['areToolsOpen']}"
+                        reason_for_reload = f"UI状态需要更新: isAdvancedOpen={ui_state['isAdvancedOpen']}, areToolsOpen={ui_state['areToolsOpen']} (期望: True)"
                         logger.info(f"   判定需要刷新和存储更新: {reason_for_reload}")
                     else:
                         server.current_ai_studio_model_id = prompt_model_path.split('/')[-1]
@@ -577,12 +577,12 @@ async def _set_model_from_page_display(page: AsyncPage, set_storage: bool = Fals
             if not ui_state_success:
                 logger.warning(f"     UI状态设置失败，使用传统方法")
                 prefs_to_set["isAdvancedOpen"] = True
-                prefs_to_set["areToolsOpen"] = False
+                prefs_to_set["areToolsOpen"] = True
             else:
                 # 确保prefs_to_set也包含正确的设置
                 prefs_to_set["isAdvancedOpen"] = True
-                prefs_to_set["areToolsOpen"] = False
-            logger.info(f"     强制 isAdvancedOpen: true, areToolsOpen: false")
+                prefs_to_set["areToolsOpen"] = True
+            logger.info(f"     强制 isAdvancedOpen: true, areToolsOpen: true")
             
             if found_model_id_from_display:
                 new_prompt_model_path = f"models/{found_model_id_from_display}"
@@ -609,6 +609,6 @@ async def _set_model_from_page_display(page: AsyncPage, set_storage: bool = Fals
                     prefs_to_set[key] = val_default
             
             await page.evaluate("(prefsStr) => localStorage.setItem('aiStudioUserPreference', prefsStr)", json.dumps(prefs_to_set))
-            logger.info(f"   ✅ localStorage.aiStudioUserPreference 已更新。isAdvancedOpen: {prefs_to_set.get('isAdvancedOpen')}, areToolsOpen: {prefs_to_set.get('areToolsOpen')}, promptModel: '{prefs_to_set.get('promptModel', '未设置/保留原样')}'。")
+            logger.info(f"   ✅ localStorage.aiStudioUserPreference 已更新。isAdvancedOpen: {prefs_to_set.get('isAdvancedOpen')}, areToolsOpen: {prefs_to_set.get('areToolsOpen')} (期望: True), promptModel: '{prefs_to_set.get('promptModel', '未设置/保留原样')}'。")
     except Exception as e_set_disp:
         logger.error(f"   尝试从页面显示设置模型时出错: {e_set_disp}", exc_info=True) 

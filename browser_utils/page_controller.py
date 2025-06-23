@@ -177,9 +177,6 @@ class PageController:
         """根据请求参数或默认配置，双向控制 Google Search 开关。"""
         self.logger.info(f"[{self.req_id}] 检查并调整 Google Search 开关...")
 
-        # 确保 "Tools" 面板已展开
-        await self._ensure_tools_panel_expanded(check_client_disconnected)
-        
         should_enable_search = self._should_enable_google_search(request_params)
 
         toggle_selector = GROUNDING_WITH_GOOGLE_SEARCH_TOGGLE_SELECTOR
@@ -212,52 +209,27 @@ class PageController:
             if isinstance(e, ClientDisconnectedError):
                  raise
 
-    async def _ensure_tools_panel_expanded(self, check_client_disconnected: Callable):
-        """确保 'Tools' 面板是展开状态。"""
-        try:
-            collapse_tools_locator = self.page.locator('button[aria-label="Expand or collapse tools"]')
-            # 等待按钮可见，以防页面尚未完全加载
-            await expect_async(collapse_tools_locator).to_be_visible(timeout=5000)
-            
-            grandparent_locator = collapse_tools_locator.locator("xpath=../..")
-            class_string = await grandparent_locator.get_attribute("class")
-
-            if class_string and "expanded" not in class_string.split():
-                self.logger.info(f"[{self.req_id}] 'Tools' 面板是折叠的，正在点击展开...")
-                await collapse_tools_locator.click(timeout=CLICK_TIMEOUT_MS)
-                await asyncio.sleep(0.5) # 等待动画完成
-                await self._check_disconnect(check_client_disconnected, "展开 'Tools' 面板后")
-                self.logger.info(f"[{self.req_id}] ✅ 'Tools' 面板已展开。")
-            else:
-                self.logger.info(f"[{self.req_id}] 'Tools' 面板已处于展开状态。")
-        except Exception as e:
-            self.logger.error(f"[{self.req_id}] ❌ 检查或展开 'Tools' 面板时出错: {e}")
-            # 如果是客户端断开连接，则重新抛出
-            if isinstance(e, ClientDisconnectedError):
-                raise
-            # 对于其他错误，记录并继续，但后续操作可能会失败
-            await save_error_snapshot(f"expand_tools_panel_error_{self.req_id}")
-
-
     async def _open_url_content(self,check_client_disconnected: Callable):
         try:
-            await self._ensure_tools_panel_expanded(check_client_disconnected)
-            
+            collapse_tools_locator = self.page.locator('button[aria-label="Expand or collapse tools"]')
+            grandparent_locator = collapse_tools_locator.locator("xpath=../..")
+
+            # 3. 获取祖父级元素的 class 属性值
+            # get_attribute 返回一个包含所有 class 的字符串，例如 "menu dropdown active"
+            class_string = await grandparent_locator.get_attribute("class")
+
+            # 4. 在 Python 中进行判断
+            # 确保 class_string 不是 None，并且 'expanded' 是一个独立的 class
+            if class_string and "expanded" not in class_string.split():
+                await collapse_tools_locator.click(timeout=CLICK_TIMEOUT_MS)
+                await asyncio.sleep(0.5)
             use_url_content_selector = self.page.locator(USE_URL_CONTEXT_SELECTOR)
-            await expect_async(use_url_content_selector).to_be_visible(timeout=5000)
             is_checked = await use_url_content_selector.get_attribute("aria-checked")
-            
             if "false" == is_checked:
-                self.logger.info(f"[{self.req_id}] URL Context 未选中，正在点击以启用...")
                 await use_url_content_selector.click(timeout=CLICK_TIMEOUT_MS)
                 await self._check_disconnect(check_client_disconnected, "点击URLCONTEXT")
-                self.logger.info(f"[{self.req_id}] ✅ URL Context 已启用。")
-            else:
-                self.logger.info(f"[{self.req_id}] URL Context 已处于启用状态。")
         except Exception as e:
             self.logger.error(f"[{self.req_id}] ❌ 操作USE_URL_CONTEXT_SELECTOR时发生错误:{e}。")
-            if isinstance(e, ClientDisconnectedError):
-                raise
 
     async def _control_thinking_budget_toggle(self, should_be_checked: bool, check_client_disconnected: Callable):
         """
