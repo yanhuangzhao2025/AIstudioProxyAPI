@@ -14,6 +14,12 @@ import logging.handlers
 import socket # 保留 socket 以便在 __main__ 中进行简单的直接运行提示
 from asyncio import Queue, Lock, Future, Task, Event
 
+# 新增: 导入 load_dotenv
+from dotenv import load_dotenv
+
+# 新增: 在所有其他导入之前加载 .env 文件
+load_dotenv()
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from fastapi import WebSocket, WebSocketDisconnect

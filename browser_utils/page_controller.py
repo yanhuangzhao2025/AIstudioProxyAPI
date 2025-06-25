@@ -62,6 +62,9 @@ class PageController:
         await self._adjust_top_p(top_p_to_set, check_client_disconnected)
         await self._check_disconnect(check_client_disconnected, "End Parameter Adjustment")
 
+        # 确保工具面板已展开，以便调整高级设置
+        await self._ensure_tools_panel_expanded(check_client_disconnected)
+
         # 调整URL CONTEXT
         if ENABLE_URL_CONTEXT:
             await self._open_url_content(check_client_disconnected)
@@ -77,9 +80,16 @@ class PageController:
     async def _handle_thinking_budget(self, request_params: Dict[str, Any], check_client_disconnected: Callable):
         """处理思考预算的调整逻辑。"""
         reasoning_effort = request_params.get('reasoning_effort')
-        if reasoning_effort is not None:
-            # 用户指定了，则开启并设置
-            self.logger.info(f"[{self.req_id}] 用户指定了 reasoning_effort: {reasoning_effort}。")
+
+        # 检查用户是否明确禁用了思考预算
+        should_disable_budget = isinstance(reasoning_effort, str) and reasoning_effort.lower() == 'none'
+
+        if should_disable_budget:
+            self.logger.info(f"[{self.req_id}] 用户通过 reasoning_effort='none' 明确禁用思考预算。")
+            await self._control_thinking_budget_toggle(should_be_checked=False, check_client_disconnected=check_client_disconnected)
+        elif reasoning_effort is not None:
+            # 用户指定了非 'none' 的值，则开启并设置
+            self.logger.info(f"[{self.req_id}] 用户指定了 reasoning_effort: {reasoning_effort}，将启用并设置思考预算。")
             await self._control_thinking_budget_toggle(should_be_checked=True, check_client_disconnected=check_client_disconnected)
             await self._adjust_thinking_budget(reasoning_effort, check_client_disconnected)
         else:
@@ -209,27 +219,50 @@ class PageController:
             if isinstance(e, ClientDisconnectedError):
                  raise
 
-    async def _open_url_content(self,check_client_disconnected: Callable):
+    async def _ensure_tools_panel_expanded(self, check_client_disconnected: Callable):
+        """确保包含高级工具（URL上下文、思考预算等）的面板是展开的。"""
+        self.logger.info(f"[{self.req_id}] 检查并确保工具面板已展开...")
         try:
             collapse_tools_locator = self.page.locator('button[aria-label="Expand or collapse tools"]')
+            await expect_async(collapse_tools_locator).to_be_visible(timeout=5000)
+            
             grandparent_locator = collapse_tools_locator.locator("xpath=../..")
+            class_string = await grandparent_locator.get_attribute("class", timeout=3000)
 
-            # 3. 获取祖父级元素的 class 属性值
-            # get_attribute 返回一个包含所有 class 的字符串，例如 "menu dropdown active"
-            class_string = await grandparent_locator.get_attribute("class")
-
-            # 4. 在 Python 中进行判断
-            # 确保 class_string 不是 None，并且 'expanded' 是一个独立的 class
             if class_string and "expanded" not in class_string.split():
+                self.logger.info(f"[{self.req_id}] 工具面板未展开，正在点击以展开...")
                 await collapse_tools_locator.click(timeout=CLICK_TIMEOUT_MS)
-                await asyncio.sleep(0.5)
+                await self._check_disconnect(check_client_disconnected, "展开工具面板后")
+                # 等待展开动画完成
+                await expect_async(grandparent_locator).to_have_class(re.compile(r'.*expanded.*'), timeout=5000)
+                self.logger.info(f"[{self.req_id}] ✅ 工具面板已成功展开。")
+            else:
+                self.logger.info(f"[{self.req_id}] 工具面板已处于展开状态。")
+        except Exception as e:
+            self.logger.error(f"[{self.req_id}] ❌ 展开工具面板时发生错误: {e}")
+            # 即使出错，也继续尝试执行后续操作，但记录错误
+            if isinstance(e, ClientDisconnectedError):
+                raise
+
+    async def _open_url_content(self,check_client_disconnected: Callable):
+        """仅负责打开 URL Context 开关，前提是面板已展开。"""
+        try:
+            self.logger.info(f"[{self.req_id}] 检查并启用 URL Context 开关...")
             use_url_content_selector = self.page.locator(USE_URL_CONTEXT_SELECTOR)
+            await expect_async(use_url_content_selector).to_be_visible(timeout=5000)
+            
             is_checked = await use_url_content_selector.get_attribute("aria-checked")
             if "false" == is_checked:
+                self.logger.info(f"[{self.req_id}] URL Context 开关未开启，正在点击以开启...")
                 await use_url_content_selector.click(timeout=CLICK_TIMEOUT_MS)
-                await self._check_disconnect(check_client_disconnected, "点击URLCONTEXT")
+                await self._check_disconnect(check_client_disconnected, "点击URLCONTEXT后")
+                self.logger.info(f"[{self.req_id}] ✅ URL Context 开关已点击。")
+            else:
+                self.logger.info(f"[{self.req_id}] URL Context 开关已处于开启状态。")
         except Exception as e:
-            self.logger.error(f"[{self.req_id}] ❌ 操作USE_URL_CONTEXT_SELECTOR时发生错误:{e}。")
+            self.logger.error(f"[{self.req_id}] ❌ 操作 USE_URL_CONTEXT_SELECTOR 时发生错误:{e}。")
+            if isinstance(e, ClientDisconnectedError):
+                raise
 
     async def _control_thinking_budget_toggle(self, should_be_checked: bool, check_client_disconnected: Callable):
         """
