@@ -23,44 +23,18 @@
     // 模型配置列表
     // 已按要求将 jfdksal98a 放到 blacktooth 的下面
     const MODELS_TO_INJECT = [
-        // Blacktooth 模型 (原 Toothless)
-        {
-            name: 'models/blacktooth-ab-test', // 已改为 blacktooth-ab-test
-            displayName: `🏴‍☠️ Blacktooth (脚本 ${SCRIPT_VERSION})`, // emoji 改为 🏴‍☠️，名称改为 Blacktooth
-            description: `由脚本 ${SCRIPT_VERSION} 注入的模型`
-        },
-        // --- jfdksal98a 模型已移动到此处 ---
-        {
-            name: 'models/jfdksal98a',
-            displayName: `🪐 jfdksal98a (脚本 ${SCRIPT_VERSION})`,
-            description: `由脚本 ${SCRIPT_VERSION} 注入的模型`
-        },
-        // --- 其他模型 ---
-        {
-            name: 'models/gemini-2.5-pro-preview-03-25',
-            displayName: `✨ Gemini 2.5 Pro 03-25 (脚本 ${SCRIPT_VERSION})`,
-            description: `由脚本 ${SCRIPT_VERSION} 注入的模型`
-        },
-        {
-            name: 'models/goldmane-ab-test',
-            displayName: `🦁 Goldmane (脚本 ${SCRIPT_VERSION})`,
-            description: `由脚本 ${SCRIPT_VERSION} 注入的模型`
-        },
-        {
-            name: 'models/claybrook-ab-test',
-            displayName: `💧 Claybrook (脚本 ${SCRIPT_VERSION})`,
-            description: `由脚本 ${SCRIPT_VERSION} 注入的模型`
-        },
-        {
-            name: 'models/frostwind-ab-test',
-            displayName: `❄️ Frostwind (脚本 ${SCRIPT_VERSION})`,
-            description: `由脚本 ${SCRIPT_VERSION} 注入的模型`
-        },
-        {
-            name: 'models/calmriver-ab-test',
-            displayName: `🌊 Calmriver (脚本 ${SCRIPT_VERSION})`,
-            description: `由脚本 ${SCRIPT_VERSION} 注入的模型`
-        }
+        { name: 'models/gemini-2.5-pro-preview-03-25', displayName: `✨ Gemini 2.5 Pro 03-25 (Script ${SCRIPT_VERSION})`, description: `Model injected by script ${SCRIPT_VERSION}` },
+        { name: 'models/gemini-2.5-pro-exp-03-25', displayName: `✨ Gemini 2.5 Pro 03-25 (Script ${SCRIPT_VERSION})`, description: `Model injected by script ${SCRIPT_VERSION}` },
+        { name: 'models/gemini-2.5-pro-preview-06-05', displayName: `✨ Gemini 2.5 Pro 03-25 (Script ${SCRIPT_VERSION})`, description: `Model injected by script ${SCRIPT_VERSION}` },
+
+        //下面模型已经失效，留下来怀念
+        // { name: 'models/blacktooth-ab-test', displayName: `🏴‍☠️ Blacktooth (脚本 ${SCRIPT_VERSION})`, description: `由脚本 ${SCRIPT_VERSION} 注入的模型` },
+        // { name: 'models/jfdksal98a', displayName: `🪐 jfdksal98a (脚本 ${SCRIPT_VERSION})`, description: `由脚本 ${SCRIPT_VERSION} 注入的模型` },
+        // { name: 'models/gemini-2.5-pro-preview-03-25', displayName: `✨ Gemini 2.5 Pro 03-25 (脚本 ${SCRIPT_VERSION})`, description: `由脚本 ${SCRIPT_VERSION} 注入的模型` },
+        // { name: 'models/goldmane-ab-test', displayName: `🦁 Goldmane (脚本 ${SCRIPT_VERSION})`, description: `由脚本 ${SCRIPT_VERSION} 注入的模型` },
+        // { name: 'models/claybrook-ab-test', displayName: `💧 Claybrook (脚本 ${SCRIPT_VERSION})`, description: `由脚本 ${SCRIPT_VERSION} 注入的模型` },
+        // { name: 'models/frostwind-ab-test', displayName: `❄️ Frostwind (脚本 ${SCRIPT_VERSION})`, description: `由脚本 ${SCRIPT_VERSION} 注入的模型` },
+        // { name: 'models/calmriver-ab-test', displayName: `🌊 Calmriver (脚本 ${SCRIPT_VERSION})`, description: `由脚本 ${SCRIPT_VERSION} 注入的模型` }
     ];
 
     // JSON 结构中的字段索引
