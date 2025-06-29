@@ -44,6 +44,6 @@ TEMPERATURE_INPUT_SELECTOR = 'div[data-test-id="temperatureSliderContainer"] inp
 USE_URL_CONTEXT_SELECTOR = 'button[aria-label="Browse the url context"]'
 SET_THINKING_BUDGET_TOGGLE_SELECTOR = 'button[aria-label="Toggle thinking budget between auto and manual"]'
 # Thinking budget slider input
-THINKING_BUDGET_INPUT_SELECTOR = 'xpath=//div[contains(@class, "settings-item") and .//p[normalize-space()="Set thinking budget"]]/following-sibling::div[contains(@class, "item-input")]//input[@type="number"]'
+THINKING_BUDGET_INPUT_SELECTOR = '//div[contains(@class, "settings-item") and .//p[normalize-space()="Set thinking budget"]]/following-sibling::div//input[@type="number"]'
 # --- Google Search Grounding ---
 GROUNDING_WITH_GOOGLE_SEARCH_TOGGLE_SELECTOR = 'div[data-test-id="searchAsAToolTooltip"] mat-slide-toggle button'
