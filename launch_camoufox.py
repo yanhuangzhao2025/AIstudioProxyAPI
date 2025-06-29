@@ -20,12 +20,13 @@ import platform
 import shutil
 
 # --- 新的导入 ---
-import uvicorn
-from server import app # 从 server.py 导入 FastAPI app 对象
 from dotenv import load_dotenv
 
-# 加载 .env 文件
+# 提前加载 .env 文件，以确保后续导入的模块能获取到正确的环境变量
 load_dotenv()
+
+import uvicorn
+from server import app # 从 server.py 导入 FastAPI app 对象
 # -----------------
 
 # 尝试导入 launch_server (用于内部启动模式，模拟 Camoufox 行为)

@@ -20,7 +20,7 @@ DEFAULT_TEMPERATURE = float(os.environ.get('DEFAULT_TEMPERATURE', '1.0'))
 DEFAULT_MAX_OUTPUT_TOKENS = int(os.environ.get('DEFAULT_MAX_OUTPUT_TOKENS', '65536'))
 DEFAULT_TOP_P = float(os.environ.get('DEFAULT_TOP_P', '0.95'))
 # --- 默认功能开关 ---
-ENABLE_URL_CONTEXT = os.environ.get('ENABLE_URL_CONTEXT', 'true').lower() in ('true', '1', 'yes')
+ENABLE_URL_CONTEXT = os.environ.get('ENABLE_URL_CONTEXT', 'false').lower() in ('true', '1', 'yes')
 ENABLE_THINKING_BUDGET = os.environ.get('ENABLE_THINKING_BUDGET', 'false').lower() in ('true', '1', 'yes')
 DEFAULT_THINKING_BUDGET = int(os.environ.get('DEFAULT_THINKING_BUDGET', '8192'))
 ENABLE_GOOGLE_SEARCH = os.environ.get('ENABLE_GOOGLE_SEARCH', 'false').lower() in ('true', '1', 'yes')
