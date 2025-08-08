@@ -11,7 +11,7 @@ INPUT_SELECTOR2 = PROMPT_TEXTAREA_SELECTOR
 # --- 按钮选择器 ---
 SUBMIT_BUTTON_SELECTOR = 'button[aria-label="Run"].run-button'
 CLEAR_CHAT_BUTTON_SELECTOR = 'button[data-test-clear="outside"][aria-label="Clear chat"]'
-CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR = 'button.mdc-button:has-text("Continue")'
+CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR = 'button.primary:has-text("Continue")'
 UPLOAD_BUTTON_SELECTOR = 'button[aria-label="Upload File"]'
 
 # --- 响应相关选择器 ---
@@ -20,7 +20,7 @@ RESPONSE_TEXT_SELECTOR = 'ms-cmark-node.cmark-node'
 
 # --- 加载和状态选择器 ---
 LOADING_SPINNER_SELECTOR = 'button[aria-label="Run"].run-button svg .stoppable-spinner'
-OVERLAY_SELECTOR = 'div.cdk-overlay-backdrop'
+OVERLAY_SELECTOR = '.mat-mdc-dialog-inner-container'
 
 # --- 错误提示选择器 ---
 ERROR_TOAST_SELECTOR = 'div.toast.warning, div.toast.error'
