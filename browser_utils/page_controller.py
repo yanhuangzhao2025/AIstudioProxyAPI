@@ -8,21 +8,22 @@ from typing import Callable, List, Dict, Any, Optional
 from playwright.async_api import Page as AsyncPage, expect as expect_async, TimeoutError
 
 from config import (
-    TEMPERATURE_INPUT_SELECTOR, MAX_OUTPUT_TOKENS_SELECTOR, STOP_SEQUENCE_INPUT_SELECTOR,
-    MAT_CHIP_REMOVE_BUTTON_SELECTOR, TOP_P_INPUT_SELECTOR, SUBMIT_BUTTON_SELECTOR,
-    CLEAR_CHAT_BUTTON_SELECTOR, CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR, OVERLAY_SELECTOR,
-    PROMPT_TEXTAREA_SELECTOR, RESPONSE_CONTAINER_SELECTOR, RESPONSE_TEXT_SELECTOR,
-    EDIT_MESSAGE_BUTTON_SELECTOR,USE_URL_CONTEXT_SELECTOR,UPLOAD_BUTTON_SELECTOR,
-    SET_THINKING_BUDGET_TOGGLE_SELECTOR, THINKING_BUDGET_INPUT_SELECTOR,
-    GROUNDING_WITH_GOOGLE_SEARCH_TOGGLE_SELECTOR
-)
-from config import (
     CLICK_TIMEOUT_MS, WAIT_FOR_ELEMENT_TIMEOUT_MS, CLEAR_CHAT_VERIFY_TIMEOUT_MS,
     DEFAULT_TEMPERATURE, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_STOP_SEQUENCES, DEFAULT_TOP_P,
     ENABLE_URL_CONTEXT, ENABLE_THINKING_BUDGET, DEFAULT_THINKING_BUDGET, ENABLE_GOOGLE_SEARCH
 )
+from config import (
+    TEMPERATURE_INPUT_SELECTOR, MAX_OUTPUT_TOKENS_SELECTOR, STOP_SEQUENCE_INPUT_SELECTOR,
+    MAT_CHIP_REMOVE_BUTTON_SELECTOR, TOP_P_INPUT_SELECTOR, SUBMIT_BUTTON_SELECTOR,
+    CLEAR_CHAT_BUTTON_SELECTOR, CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR, OVERLAY_SELECTOR,
+    PROMPT_TEXTAREA_SELECTOR, RESPONSE_CONTAINER_SELECTOR, RESPONSE_TEXT_SELECTOR,
+    EDIT_MESSAGE_BUTTON_SELECTOR, USE_URL_CONTEXT_SELECTOR, UPLOAD_BUTTON_SELECTOR,
+    SET_THINKING_BUDGET_TOGGLE_SELECTOR, THINKING_BUDGET_INPUT_SELECTOR,
+    GROUNDING_WITH_GOOGLE_SEARCH_TOGGLE_SELECTOR
+)
 from models import ClientDisconnectedError
 from .operations import save_error_snapshot, _wait_for_response_completion, _get_final_response_content
+
 
 class PageController:
     """封装了与AI Studio页面交互的所有操作。"""
@@ -557,7 +558,7 @@ class PageController:
 
             can_attempt_clear = False
             try:
-                await expect_async(clear_chat_button_locator).to_be_enabled(timeout=3000)
+                await expect_async(clear_chat_button_locator).to_be_enabled(timeout=30000)
                 can_attempt_clear = True
                 self.logger.info(f"[{self.req_id}] \"清空聊天\"按钮可用，继续清空流程。")
             except Exception as e_enable:
