@@ -294,6 +294,29 @@ async def switch_ai_studio_model(page: AsyncPage, model_id: str, req_id: str) ->
                 logger.warning(f"[{req_id}] 读取页面显示的当前模型ID时出错: {e_disp}。将无法验证页面显示。")
 
             if page_display_match:
+                try:
+                    logger.info(f"[{req_id}] 模型切换成功，重新启用 '临时聊天' 模式...")
+                    incognito_button_locator = page.locator('button[aria-label="Temporary chat toggle"]')
+                    
+                    await incognito_button_locator.wait_for(state="visible", timeout=5000)
+                    
+                    button_classes = await incognito_button_locator.get_attribute("class")
+                    
+                    if button_classes and 'ms-button-active' in button_classes:
+                        logger.info(f"[{req_id}] '临时聊天' 模式已处于激活状态。")
+                    else:
+                        logger.info(f"[{req_id}] '临时聊天' 模式未激活，正在点击以开启...")
+                        await incognito_button_locator.click(timeout=3000)
+                        await asyncio.sleep(0.5)
+                        
+                        updated_classes = await incognito_button_locator.get_attribute("class")
+                        if updated_classes and 'ms-button-active' in updated_classes:
+                             logger.info(f"[{req_id}] ✅ '临时聊天' 模式已成功重新启用。")
+                        else:
+                             logger.warning(f"[{req_id}] ⚠️ 点击后 '临时聊天' 模式状态验证失败，可能未成功重新开启。")
+                
+                except Exception as e:
+                    logger.warning(f"[{req_id}] ⚠️ 模型切换后重新启用 '临时聊天' 模式失败: {e}")
                 return True
             else:
                 logger.error(f"[{req_id}] ❌ 模型切换失败，因为页面显示的模型与期望不符 (即使localStorage可能已更改)。")

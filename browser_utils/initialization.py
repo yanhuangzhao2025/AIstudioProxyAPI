@@ -597,3 +597,33 @@ async def _handle_auth_file_save_auto(temp_context):
     except Exception as save_state_err:
         logger.error(f"   ❌ 自动保存认证状态失败: {save_state_err}", exc_info=True)
         print(f"   ❌ 自动保存认证状态失败: {save_state_err}", flush=True)
+
+async def enable_temporary_chat_mode(page: AsyncPage):
+    """
+    检查并启用 AI Studio 界面的“临时聊天”模式。
+    这是一个独立的UI操作，应该在页面完全稳定后调用。
+    """
+    try:
+        logger.info("-> (UI Op) 正在检查并启用 '临时聊天' 模式...")
+        
+        incognito_button_locator = page.locator('button[aria-label="Temporary chat toggle"]')
+        
+        await incognito_button_locator.wait_for(state="visible", timeout=10000)
+        
+        button_classes = await incognito_button_locator.get_attribute("class")
+        
+        if button_classes and 'ms-button-active' in button_classes:
+            logger.info("-> (UI Op) '临时聊天' 模式已激活。")
+        else:
+            logger.info("-> (UI Op) '临时聊天' 模式未激活，正在点击...")
+            await incognito_button_locator.click(timeout=5000, force=True)
+            await asyncio.sleep(1)
+            
+            updated_classes = await incognito_button_locator.get_attribute("class")
+            if updated_classes and 'ms-button-active' in updated_classes:
+                logger.info("✅ (UI Op) '临时聊天' 模式已成功启用。")
+            else:
+                logger.warning("⚠️ (UI Op) 点击后 '临时聊天' 模式状态验证失败。")
+
+    except Exception as e:
+        logger.warning(f"⚠️ (UI Op) 启用 '临时聊天' 模式时出错: {e}")

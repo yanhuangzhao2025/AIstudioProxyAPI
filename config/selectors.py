@@ -11,7 +11,7 @@ INPUT_SELECTOR2 = PROMPT_TEXTAREA_SELECTOR
 # --- 按钮选择器 ---
 SUBMIT_BUTTON_SELECTOR = 'button[aria-label="Run"].run-button'
 CLEAR_CHAT_BUTTON_SELECTOR = 'button[data-test-clear="outside"][aria-label="New chat"]'
-CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR = 'button.ms-button-primary:has-text("Continue")'
+CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR = 'button.ms-button-primary:has-text("Discard and continue")'
 UPLOAD_BUTTON_SELECTOR = 'button[aria-label^="Insert assets"]'
 
 # --- 响应相关选择器 ---
