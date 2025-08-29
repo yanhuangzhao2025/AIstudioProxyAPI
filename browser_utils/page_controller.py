@@ -10,7 +10,7 @@ from playwright.async_api import Page as AsyncPage, expect as expect_async, Time
 from config import (
     TEMPERATURE_INPUT_SELECTOR, MAX_OUTPUT_TOKENS_SELECTOR, STOP_SEQUENCE_INPUT_SELECTOR,
     MAT_CHIP_REMOVE_BUTTON_SELECTOR, TOP_P_INPUT_SELECTOR, SUBMIT_BUTTON_SELECTOR,
-    CLEAR_CHAT_BUTTON_SELECTOR, CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR, OVERLAY_SELECTOR,
+    NEW_CHAT_LINK_SELECTOR, OVERLAY_SELECTOR,
     PROMPT_TEXTAREA_SELECTOR, RESPONSE_CONTAINER_SELECTOR, RESPONSE_TEXT_SELECTOR,
     EDIT_MESSAGE_BUTTON_SELECTOR,USE_URL_CONTEXT_SELECTOR,UPLOAD_BUTTON_SELECTOR,
     SET_THINKING_BUDGET_TOGGLE_SELECTOR, THINKING_BUDGET_INPUT_SELECTOR,
@@ -531,52 +531,43 @@ class PageController:
                 raise
 
     async def clear_chat_history(self, check_client_disconnected: Callable):
-        """清空聊天记录。"""
-        self.logger.info(f"[{self.req_id}] 开始清空聊天记录...")
-        await self._check_disconnect(check_client_disconnected, "Start Clear Chat")
+        """
+        通过点击“新建对话”链接来创建一个新的、干净的聊天会话，
+        以替代旧的、已被移除的“清空对话”按钮功能。
+        """
+        self.logger.info(f"[{self.req_id}] 开始创建新对话以清空上下文...")
+        await self._check_disconnect(check_client_disconnected, "Start New Chat")
 
         try:
-            # 一般是使用流式代理时遇到,流式输出已结束,但页面上AI仍回复个不停,此时会锁住清空按钮,但页面仍是/new_chat,而跳过后续清空操作
-            # 导致后续请求无法发出而卡住,故先检查并点击发送按钮(此时是停止功能)
-            submit_button_locator = self.page.locator(SUBMIT_BUTTON_SELECTOR)
-            try:
-                self.logger.info(f"[{self.req_id}] 尝试检查发送按钮状态...")
-                # 使用较短的超时时间（1秒），避免长时间阻塞，因为这不是清空流程的常见步骤
-                await expect_async(submit_button_locator).to_be_enabled(timeout=1000)
-                self.logger.info(f"[{self.req_id}] 发送按钮可用，尝试点击并等待1秒...")
-                await submit_button_locator.click(timeout=CLICK_TIMEOUT_MS)
-                await asyncio.sleep(1.0)
-                self.logger.info(f"[{self.req_id}] 发送按钮点击并等待完成。")
-            except Exception as e_submit:
-                # 如果发送按钮不可用、超时或发生Playwright相关错误，记录日志并继续
-                self.logger.info(f"[{self.req_id}] 发送按钮不可用或检查/点击时发生Playwright错误。符合预期,继续检查清空按钮。")
+            # 定位“新建对话”链接
+            new_chat_link_locator = self.page.locator(NEW_CHAT_LINK_SELECTOR)
 
-            clear_chat_button_locator = self.page.locator(CLEAR_CHAT_BUTTON_SELECTOR)
-            confirm_button_locator = self.page.locator(CLEAR_CHAT_CONFIRM_BUTTON_SELECTOR)
-            overlay_locator = self.page.locator(OVERLAY_SELECTOR)
+            # 等待链接可见并可点击
+            self.logger.info(f"[{self.req_id}] 等待 '新建对话' 链接可见...")
+            await expect_async(new_chat_link_locator).to_be_visible(timeout=WAIT_FOR_ELEMENT_TIMEOUT_MS)
+            await expect_async(new_chat_link_locator).to_be_enabled(timeout=WAIT_FOR_ELEMENT_TIMEOUT_MS)
+            await self._check_disconnect(check_client_disconnected, "New Chat Link Visible")
 
-            can_attempt_clear = False
-            try:
-                await expect_async(clear_chat_button_locator).to_be_enabled(timeout=3000)
-                can_attempt_clear = True
-                self.logger.info(f"[{self.req_id}] \"清空聊天\"按钮可用，继续清空流程。")
-            except Exception as e_enable:
-                is_new_chat_url = '/prompts/new_chat' in self.page.url.rstrip('/')
-                if is_new_chat_url:
-                    self.logger.info(f"[{self.req_id}] \"清空聊天\"按钮不可用 (预期，因为在 new_chat 页面)。跳过清空操作。")
-                else:
-                    self.logger.warning(f"[{self.req_id}] 等待\"清空聊天\"按钮可用失败: {e_enable}。清空操作可能无法执行。")
+            # 模拟用户点击操作
+            self.logger.info(f"[{self.req_id}] 点击 '新建对话' 链接...")
+            await new_chat_link_locator.click(timeout=CLICK_TIMEOUT_MS)
 
-            await self._check_disconnect(check_client_disconnected, "清空聊天 - \"清空聊天\"按钮可用性检查后")
+            # 等待页面导航
+            await asyncio.sleep(1.0) # 给予页面足够的时间开始导航
+            await self._check_disconnect(check_client_disconnected, "After New Chat Click")
 
-            if can_attempt_clear:
-                await self._execute_chat_clear(clear_chat_button_locator, confirm_button_locator, overlay_locator, check_client_disconnected)
-                await self._verify_chat_cleared(check_client_disconnected)
+            # 验证URL是否已更改为新对话URL
+            final_url = self.page.url
+            if '/prompts/new_chat' in final_url:
+                self.logger.info(f"[{self.req_id}] ✅ 成功创建新对话。当前 URL: {final_url}")
+            else:
+                self.logger.warning(f"[{self.req_id}] ⚠️ 创建新对话后URL验证失败。当前 URL: {final_url}")
+                # 即使验证失败，也可能已经成功，所以不抛出异常，只记录警告
 
-        except Exception as e_clear:
-            self.logger.error(f"[{self.req_id}] 清空聊天过程中发生错误: {e_clear}")
-            if not (isinstance(e_clear, ClientDisconnectedError) or (hasattr(e_clear, 'name') and 'Disconnect' in e_clear.name)):
-                await save_error_snapshot(f"clear_chat_error_{self.req_id}")
+        except Exception as e_new_chat:
+            self.logger.error(f"[{self.req_id}] 创建新对话过程中发生错误: {e_new_chat}")
+            if not isinstance(e_new_chat, ClientDisconnectedError):
+                await save_error_snapshot(f"new_chat_error_{self.req_id}")
             raise
 
     async def _execute_chat_clear(self, clear_chat_button_locator, confirm_button_locator, overlay_locator, check_client_disconnected: Callable):
