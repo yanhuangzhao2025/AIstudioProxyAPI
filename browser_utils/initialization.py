@@ -416,13 +416,36 @@ async def _initialize_page_logic(browser: AsyncBrowser):
             await expect_async(found_page.locator(INPUT_SELECTOR)).to_be_visible(timeout=10000)
             logger.info("-> ✅ 核心输入区域可见。")
             
-            model_name_locator = found_page.locator('mat-select[data-test-ms-model-selector] .model-option-content span')
-            try:
-                model_name_on_page = await model_name_locator.first.inner_text(timeout=5000)
-                logger.info(f"-> 🤖 页面检测到的当前模型: {model_name_on_page}")
-            except PlaywrightAsyncError as e:
-                logger.error(f"获取模型名称时出错 (model_name_locator): {e}")
-                raise
+            # 改进模型名称获取，使用新的选择器
+            model_name_on_page = None
+            model_selectors = [
+                # 新的 ms-model-selector-v3 结构选择器
+                'ms-model-selector-v3 button.model-selector-card .title',
+                'ms-model-selector-v3 .model-selector-card .title',
+                'ms-model-selector-v3 .title',
+                'ms-model-selector-v3 .subtitle[data-test-id="model-name"]',
+                'ms-model-selector-v3 .subtitle',
+                # 旧的 mat-select 结构选择器（作为备用）
+                'mat-select[data-test-ms-model-selector] .model-option-content span',
+                'mat-select[data-test-ms-model-selector] span',
+                'mat-select .model-option-content span',
+                'mat-select span'
+            ]
+            
+            for selector in model_selectors:
+                try:
+                    logger.info(f"   尝试模型选择器: {selector}")
+                    model_name_locator = found_page.locator(selector)
+                    model_name_on_page = await model_name_locator.first.inner_text(timeout=5000)
+                    if model_name_on_page and model_name_on_page.strip():
+                        logger.info(f"-> 🤖 页面检测到的当前模型: {model_name_on_page}")
+                        break
+                except Exception as e:
+                    logger.debug(f"   选择器 {selector} 失败: {e}")
+                    continue
+            
+            if not model_name_on_page:
+                logger.warning("-> ⚠️ 无法获取模型名称，但继续初始化")
             
             result_page_instance = found_page
             result_page_ready = True

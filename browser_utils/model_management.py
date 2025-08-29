@@ -280,9 +280,33 @@ async def switch_ai_studio_model(page: AsyncPage, model_id: str, req_id: str) ->
                 page_display_match = True
             else:
                 try:
-                    model_name_locator = page.locator('mat-select[data-test-ms-model-selector] .model-option-content span')
-                    actual_displayed_model_name_on_page_raw = await model_name_locator.first.inner_text(timeout=5000)
-                    actual_displayed_model_name_on_page = actual_displayed_model_name_on_page_raw.strip()
+                    # 使用新的选择器获取模型名称
+                    model_name_on_page = None
+                    model_selectors = [
+                        'ms-model-selector-v3 button.model-selector-card .title',
+                        'ms-model-selector-v3 .model-selector-card .title',
+                        'ms-model-selector-v3 .title',
+                        'ms-model-selector-v3 .subtitle[data-test-id="model-name"]',
+                        'ms-model-selector-v3 .subtitle',
+                        'mat-select[data-test-ms-model-selector] .model-option-content span',
+                        'mat-select[data-test-ms-model-selector] span',
+                        'mat-select .model-option-content span',
+                        'mat-select span'
+                    ]
+                    
+                    for selector in model_selectors:
+                        try:
+                            model_name_locator = page.locator(selector)
+                            model_name_on_page = await model_name_locator.first.inner_text(timeout=5000)
+                            if model_name_on_page and model_name_on_page.strip():
+                                break
+                        except Exception:
+                            continue
+                    
+                    if not model_name_on_page:
+                        model_name_on_page = "Default"
+                    
+                    actual_displayed_model_name_on_page = model_name_on_page.strip()
                     normalized_actual_display = actual_displayed_model_name_on_page.lower()
                     normalized_expected_display = expected_display_name_for_target_id.strip().lower()
                     
@@ -306,8 +330,33 @@ async def switch_ai_studio_model(page: AsyncPage, model_id: str, req_id: str) ->
         current_displayed_name_for_revert_stripped = "无法读取"
         
         try:
-            model_name_locator_revert = page.locator('mat-select[data-test-ms-model-selector] .model-option-content span')
-            current_displayed_name_for_revert_raw = await model_name_locator_revert.first.inner_text(timeout=5000)
+            # 使用新的选择器获取模型名称
+            model_name_on_page = None
+            model_selectors = [
+                'ms-model-selector-v3 button.model-selector-card .title',
+                'ms-model-selector-v3 .model-selector-card .title',
+                'ms-model-selector-v3 .title',
+                'ms-model-selector-v3 .subtitle[data-test-id="model-name"]',
+                'ms-model-selector-v3 .subtitle',
+                'mat-select[data-test-ms-model-selector] .model-option-content span',
+                'mat-select[data-test-ms-model-selector] span',
+                'mat-select .model-option-content span',
+                'mat-select span'
+            ]
+            
+            for selector in model_selectors:
+                try:
+                    model_name_locator_revert = page.locator(selector)
+                    model_name_on_page = await model_name_locator_revert.first.inner_text(timeout=5000)
+                    if model_name_on_page and model_name_on_page.strip():
+                        break
+                except Exception:
+                    continue
+            
+            if not model_name_on_page:
+                model_name_on_page = "Default"
+            
+            current_displayed_name_for_revert_raw = model_name_on_page
             current_displayed_name_for_revert_stripped = current_displayed_name_for_revert_raw.strip()
             logger.info(f"[{req_id}] 恢复：页面当前显示的模型名称 (原始: '{current_displayed_name_for_revert_raw}', 清理后: '{current_displayed_name_for_revert_stripped}')")
         except Exception as e_read_disp_revert:
@@ -529,10 +578,41 @@ async def _set_model_from_page_display(page: AsyncPage, set_storage: bool = Fals
     
     try:
         logger.info("   尝试从页面显示元素读取当前模型名称...")
-        model_name_locator = page.locator('mat-select[data-test-ms-model-selector] .model-option-content span')
-        displayed_model_name_from_page_raw = await model_name_locator.first.inner_text(timeout=7000)
-        displayed_model_name = displayed_model_name_from_page_raw.strip()
-        logger.info(f"   页面当前显示模型名称 (原始: '{displayed_model_name_from_page_raw}', 清理后: '{displayed_model_name}')")
+        
+        # 使用新的选择器获取模型名称
+        model_name_on_page = None
+        model_selectors = [
+            # 新的 ms-model-selector-v3 结构选择器
+            'ms-model-selector-v3 button.model-selector-card .title',
+            'ms-model-selector-v3 .model-selector-card .title',
+            'ms-model-selector-v3 .title',
+            'ms-model-selector-v3 .subtitle[data-test-id="model-name"]',
+            'ms-model-selector-v3 .subtitle',
+            # 旧的 mat-select 结构选择器（作为备用）
+            'mat-select[data-test-ms-model-selector] .model-option-content span',
+            'mat-select[data-test-ms-model-selector] span',
+            'mat-select .model-option-content span',
+            'mat-select span'
+        ]
+        
+        for selector in model_selectors:
+            try:
+                logger.info(f"   尝试模型选择器: {selector}")
+                model_name_locator = page.locator(selector)
+                model_name_on_page = await model_name_locator.first.inner_text(timeout=7000)
+                if model_name_on_page and model_name_on_page.strip():
+                    logger.info(f"   ✅ 成功获取模型名称: {model_name_on_page.strip()}")
+                    break
+            except Exception as e:
+                logger.debug(f"   选择器 {selector} 失败: {e}")
+                continue
+        
+        if not model_name_on_page:
+            logger.warning("   无法获取模型名称，使用默认值")
+            model_name_on_page = "Default"
+        
+        displayed_model_name = model_name_on_page.strip()
+        logger.info(f"   页面当前显示模型名称 (原始: '{model_name_on_page}', 清理后: '{displayed_model_name}')")
         
         found_model_id_from_display = None
         if model_list_fetch_event and not model_list_fetch_event.is_set():
